@@ -18,6 +18,7 @@ import 'package:package_config/packages.dart';
 import 'package:package_config/packages_file.dart' as pkgs;
 import 'package:package_config/src/packages_impl.dart'
     show NonFilePackagesDirectoryPackages, MapPackages;
+import 'package:package_config/src/util.dart' show checkValidPackageUri;
 
 const bool forceIncrementalSupport =
     const bool.fromEnvironment('DART2JS_EXPERIMENTAL_INCREMENTAL_SUPPORT');
@@ -345,6 +346,12 @@ class Compiler extends leg.Compiler {
   }
 
   Uri translatePackageUri(leg.Spannable node, Uri uri) {
+    try {
+      checkValidPackageUri(uri);
+    } on ArgumentError {
+      reportError(node, leg.MessageKind.INVALID_URI, {'uri': uri});
+      return null;
+    }
     return packages.resolve(uri);
   }
 
