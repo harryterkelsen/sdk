@@ -348,11 +348,21 @@ class Compiler extends leg.Compiler {
   Uri translatePackageUri(leg.Spannable node, Uri uri) {
     try {
       checkValidPackageUri(uri);
-    } on ArgumentError {
-      reportError(node, leg.MessageKind.INVALID_URI, {'uri': uri});
+    } on ArgumentError catch (e) {
+      reportError(
+          node,
+          leg.MessageKind.INVALID_PACKAGE_URI,
+          {'uri': uri, 'exception': e.message});
       return null;
     }
-    return packages.resolve(uri);
+    return packages.resolve(uri, (Uri notFound) {
+      reportError(
+          node,
+          leg.MessageKind.LIBRARY_NOT_FOUND,
+          {'resolvedUri': uri}
+      );
+      return null;
+    });
   }
 
   Future setupPackages(Uri uri) async {
