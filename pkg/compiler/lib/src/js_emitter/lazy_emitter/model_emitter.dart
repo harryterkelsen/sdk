@@ -14,7 +14,6 @@ import '../../core_types.dart' show
 import '../../elements/elements.dart' show
     ClassElement,
     FunctionElement;
-import '../../helpers/helpers.dart';
 import '../../js/js.dart' as js;
 import '../../js_backend/js_backend.dart' show
     JavaScriptBackend,
