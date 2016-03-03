@@ -1,17 +1,5 @@
 ## 1.15.0
 
-### Language features
-* Added support for [configuration-specific imports](https://github.com/munificent/dep-interface-libraries/blob/master/Proposal.md).
-  On the VM and dart2js, they can be enabled with `--conditional-directives`.
-
-  The analyzer requires an additional option in an `options` file:
-  ```yaml
-  analyzer:
-    language:
-      enableConditionalDirectives: true
-  ```
-  Then run the analyzer with `--options=<path-to-options-file>`.
-
 ### Core library changes
 
 * `dart:async`
@@ -34,6 +22,26 @@
     optional named parameter `password`, similar to
     `SecurityContext.usePrivateKeyBytes`, for use as the password for PKCS12
     data.
+
+### Service protocol changes
+
+* Fixed a documentation bug where the field `extensionRPCs` in `Isolate`
+  was not marked optional.
+
+### Experimental language features
+  * Added support for [configuration-specific imports](https://github.com/munificent/dep-interface-libraries/blob/master/Proposal.md).
+    On the VM and `dart2js`, they can be enabled with `--conditional-directives`.
+
+    The analyzer requires additional configuration:
+    ```yaml
+    analyzer:
+      language:
+        enableConditionalDirectives: true
+    ```
+
+    Read about [configuring the analyzer] for more details.
+
+[configuring the analyzer]: https://github.com/dart-lang/sdk/tree/master/pkg/analyzer#configuring-the-analyzer
 
 ## 1.14.2 - 2016-02-09
 
