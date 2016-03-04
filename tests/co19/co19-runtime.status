@@ -59,9 +59,6 @@ LibTest/core/List/List_class_A01_t02: Pass, Slow
 [ ($runtime == vm || $runtime == dart_precompiled || $runtime == dart_product) && ($arch != x64 && $arch != simarm64 && $arch != arm64) ]
 LibTest/core/int/operator_left_shift_A01_t02: Fail # co19 issue 129
 
-[ ($runtime == vm || $runtime == dart_precompiled || $runtime == dart_product) && $arch == mips ]
-LibTest/core/double/toInt_A01_t01: Fail # Issue 25900
-
 [ ($compiler == none || $compiler == precompiler) && ($runtime == vm || $runtime == dart_precompiled) && ($arch == mips || $arch == arm64) ]
 # These tests take too much memory (300 MB) for our 1 GB test machine.
 # co19 issue 673. http://code.google.com/p/co19/issues/detail?id=673
@@ -148,15 +145,7 @@ Language/Metadata/*: SkipByDesign # Uses dart:mirrors
 [ $runtime == dart_precompiled || $runtime == dart_product ]
 LibTest/isolate/Isolate/spawnUri*: Skip # Isolate.spawnUri
 
-[ $runtime == dart_precompiled ]
-Language/Expressions/Constants/identifier_denotes_a_constant_t05: Crash # Issue 25892
-Language/Expressions/Constants/static_method_t01: Crash # Issue 25892
-
 [ $noopt || $compiler == precompiler ]
-LibTest/collection/ListBase/ListBase_class_A01_t02: Pass, Timeout
-LibTest/collection/ListMixin/ListMixin_class_A01_t02: Pass, Timeout
-LibTest/core/Map/Map_class_A01_t04: Pass, Timeout
-LibTest/core/Uri/encodeQueryComponent_A01_t02: Pass, Timeout
 LibTest/collection/ListBase/ListBase_class_A01_t02: Pass, Timeout
 LibTest/collection/ListMixin/ListMixin_class_A01_t02: Pass, Timeout
 LibTest/core/Map/Map_class_A01_t04: Pass, Timeout
