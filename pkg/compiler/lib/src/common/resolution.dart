@@ -19,6 +19,7 @@ import '../elements/elements.dart'
         FunctionSignature,
         LibraryElement,
         MetadataAnnotation,
+        MethodElement,
         ResolvedAst,
         TypedefElement;
 import '../enqueue.dart' show ResolutionEnqueuer;
@@ -26,7 +27,8 @@ import '../options.dart' show ParserOptions;
 import '../parser/element_listener.dart' show ScannerOptions;
 import '../parser/parser_task.dart';
 import '../patch_parser.dart';
-import '../tree/tree.dart' show TypeAnnotation;
+import '../tree/tree.dart' show Send, TypeAnnotation;
+import '../universe/call_structure.dart' show CallStructure;
 import '../universe/world_impact.dart' show WorldImpact;
 import 'backend_api.dart';
 import 'work.dart' show ItemCompilationContext, WorkItem;
@@ -55,9 +57,8 @@ class ResolutionImpact extends WorldImpact {
   Iterable<MapLiteralUse> get mapLiterals => const <MapLiteralUse>[];
   Iterable<ListLiteralUse> get listLiterals => const <ListLiteralUse>[];
   Iterable<String> get constSymbolNames => const <String>[];
-  Iterable<ConstantExpression> get constantLiterals {
-    return const <ConstantExpression>[];
-  }
+  Iterable<ConstantExpression> get constantLiterals =>
+      const <ConstantExpression>[];
 
   Iterable<dynamic> get nativeData => const <dynamic>[];
 }
@@ -206,6 +207,29 @@ abstract class Target {
   /// Resolve target specific information for [element] and register it with
   /// [registry].
   void resolveNativeElement(Element element, NativeRegistry registry) {}
+
+  /// Processes [element] for resolution and returns the [MethodElement] that
+  /// defines the implementation of [element].
+  MethodElement resolveExternalFunction(MethodElement element) => element;
+
+  /// Called when resolving a call to a foreign function. If a non-null value
+  /// is returned, this is stored as native data for [node] in the resolved
+  /// AST.
+  dynamic resolveForeignCall(Send node, Element element,
+      CallStructure callStructure, ForeignResolver resolver) {
+    return null;
+  }
+
+  /// Returns the
+  ClassElement defaultSuperclass(ClassElement element);
+
+  /// Returns `true` if [element] is a native element, that is, that the
+  /// corresponding entity already exists in the target language.
+  bool isNative(Element element) => false;
+
+  /// Returns `true` if [element] is a foreign element, that is, that the
+  /// backend has specialized handling for the element.
+  bool isForeign(Element element) => false;
 }
 
 // TODO(johnniwinther): Rename to `Resolver` or `ResolverContext`.

@@ -23,7 +23,7 @@ class VariableDefinitionsVisitor extends CommonResolverVisitor<Identifier> {
 
   VariableDefinitionsVisitor(
       Compiler compiler, this.definitions, this.resolver, this.variables)
-      : super(compiler) {}
+      : super(compiler);
 
   ResolutionRegistry get registry => resolver.registry;
 

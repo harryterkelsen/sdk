@@ -27,6 +27,7 @@ import '../elements/modelx.dart'
         ParameterElementX,
         VariableElementX,
         VariableList;
+import '../options.dart';
 import '../tokens/token.dart' show isUserDefinableOperator;
 import '../tree/tree.dart';
 import '../universe/call_structure.dart' show CallStructure;
@@ -73,6 +74,11 @@ enum ConstantState {
  * except for testing.
  */
 class ResolverVisitor extends MappingVisitor<ResolutionResult> {
+  final CompilerOptions options;
+  final CoreClasses coreClasses;
+  final CoreTypes coreTypes;
+  final ResolverTask resolver;
+
   /**
    * The current enclosing element for the visited AST nodes.
    *
@@ -142,9 +148,17 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
           r')$');
 
   ResolverVisitor(
-      Compiler compiler, Element element, ResolutionRegistry registry,
-      {Scope scope, bool useEnclosingScope: false})
+      Element element,
+      ResolutionRegistry registry,
+      CompilerOptions options,
+      this.coreClasses,
+      this.coreTypes,
+      ResolverTask resolver,
+      {Scope scope,
+      bool useEnclosingScope: false})
       : this.enclosingElement = element,
+        this.options = options,
+        this.resolver = resolver,
         // When the element is a field, we are actually resolving its
         // initial value, which should not have access to instance
         // fields.
@@ -159,7 +173,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
                 : element.buildScope()),
         // The type annotations on a typedef do not imply type checks.
         // TODO(karlklose): clean this up (dartbug.com/8870).
-        inCheckContext = compiler.options.enableTypeAssertions &&
+        inCheckContext = options.enableTypeAssertions &&
             !element.isLibrary &&
             !element.isTypedef &&
             !element.enclosingElement.isTypedef,
@@ -167,11 +181,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
         constantState = element.isConst
             ? ConstantState.CONSTANT
             : ConstantState.NON_CONSTANT,
-        super(compiler, registry);
-
-  CoreClasses get coreClasses => compiler.coreClasses;
-
-  CoreTypes get coreTypes => compiler.coreTypes;
+        super(registry, reporter, resolution, enqueuer, resolver, types);
 
   AsyncMarker get currentAsyncMarker {
     if (enclosingElement is FunctionElement) {
@@ -444,7 +454,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
       // fields they reference are visible, but must be resolved independently.
       if (element.isInitializingFormal) {
         registry.useElement(parameterNode, element);
-        if (compiler.options.enableInitializingFormalAccess) {
+        if (options.enableInitializingFormalAccess) {
           InitializingFormalElementX initializingFormalElementX = element;
           defineLocalVariable(parameterNode, initializingFormalElementX);
           addToScope(initializingFormalElementX);
@@ -459,7 +469,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
     addDeferredAction(enclosingElement, () {
       functionSignature.forEachOptionalParameter((ParameterElementX parameter) {
         parameter.constant =
-            compiler.resolver.constantCompiler.compileConstant(parameter);
+            resolver.constantCompiler.compileConstant(parameter);
       });
     });
     if (inCheckContext) {
@@ -470,7 +480,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
   }
 
   ResolutionResult visitAssert(Assert node) {
-    if (!compiler.options.enableAssertMessage) {
+    if (!options.enableAssertMessage) {
       if (node.hasMessage) {
         reporter.reportErrorMessage(
             node, MessageKind.EXPERIMENTAL_ASSERT_MESSAGE);
@@ -2022,7 +2032,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
   ResolutionResult handleConstantTypeLiteralUpdate(SendSet node, Name name,
       TypeDeclarationElement element, DartType type, ConstantAccess semantics) {
     // TODO(johnniwinther): Remove this when all constants are evaluated.
-    compiler.resolver.constantCompiler.evaluate(semantics.constant);
+    resolver.constantCompiler.evaluate(semantics.constant);
 
     ErroneousElement error;
     if (node.isIfNullAssignment) {
@@ -2574,7 +2584,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
         semantics = new StaticAccess.parameter(element);
       }
     } else if (element.isInitializingFormal &&
-        compiler.options.enableInitializingFormalAccess) {
+        options.enableInitializingFormalAccess) {
       error = reportAndCreateErroneousElement(node.selector, name.text,
           MessageKind.UNDEFINED_STATIC_SETTER_BUT_GETTER, {'name': name});
       semantics = new StaticAccess.finalParameter(element);

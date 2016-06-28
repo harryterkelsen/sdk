@@ -6,8 +6,10 @@ library dart2js.resolution.common;
 
 import '../common.dart';
 import '../common/resolution.dart' show Resolution;
-import '../compiler.dart' show Compiler;
+import '../dart_types.dart';
 import '../elements/elements.dart';
+import '../enqueue.dart';
+import '../resolution/resolution.dart';
 import '../tree/tree.dart';
 
 import 'registry.dart' show ResolutionRegistry;
@@ -15,13 +17,11 @@ import 'scope.dart' show Scope;
 import 'type_resolver.dart' show TypeResolver;
 
 class CommonResolverVisitor<R> extends Visitor<R> {
-  final Compiler compiler;
+  final DiagnosticReporter reporter;
+  final Resolution resolution;
+  final ResolutionEnqueuer enqueuer;
 
-  CommonResolverVisitor(Compiler this.compiler);
-
-  DiagnosticReporter get reporter => compiler.reporter;
-
-  Resolution get resolution => compiler.resolution;
+  CommonResolverVisitor(this.reporter, this.resolution, this.enqueuer);
 
   R visitNode(Node node) {
     return reporter.internalError(
@@ -33,8 +33,10 @@ class CommonResolverVisitor<R> extends Visitor<R> {
   /** Convenience method for visiting nodes that may be null. */
   R visit(Node node) => (node == null) ? null : node.accept(this);
 
+  // TODO(het): get rid of this method? it adds a dependency on
+  // ResolutionEnqueuer and just forwards a call to it.
   void addDeferredAction(Element element, void action()) {
-    compiler.enqueuer.resolution.addDeferredAction(element, action);
+    enqueuer.addDeferredAction(element, action);
   }
 }
 
@@ -52,9 +54,15 @@ abstract class MappingVisitor<T> extends CommonResolverVisitor<T> {
   /// The current scope of the visitor.
   Scope get scope;
 
-  MappingVisitor(Compiler compiler, ResolutionRegistry this.registry)
-      : typeResolver = new TypeResolver(compiler),
-        super(compiler);
+  MappingVisitor(
+      this.registry,
+      DiagnosticReporter reporter,
+      Resolution resolution,
+      ResolutionEnqueuer enqueuer,
+      ResolverTask resolver,
+      Types types)
+      : typeResolver = new TypeResolver(reporter, resolution, resolver, types),
+        super(reporter, resolution, enqueuer);
 
   AsyncMarker get currentAsyncMarker => AsyncMarker.SYNC;
 

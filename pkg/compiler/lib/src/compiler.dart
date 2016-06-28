@@ -386,6 +386,8 @@ abstract class Compiler implements LibraryLoaderListener {
   bool get disableTypeInference =>
       options.disableTypeInference || compilationFailed;
 
+  // TODO(het): remove this from here. Either inline at all use sites or add it
+  // to Reporter.
   void unimplemented(Spannable spannable, String methodName) {
     reporter.internalError(spannable, "$methodName not implemented.");
   }

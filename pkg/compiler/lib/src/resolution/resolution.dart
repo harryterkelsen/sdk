@@ -9,8 +9,8 @@ import 'dart:collection' show Queue;
 import '../common.dart';
 import '../common/names.dart' show Identifiers;
 import '../common/resolution.dart'
-    show Feature, ParsingContext, Resolution, ResolutionImpact;
-import '../common/tasks.dart' show CompilerTask;
+    show Feature, ParsingContext, Resolution, ResolutionImpact, Target;
+import '../common/tasks.dart' show CompilerTask, Measurer;
 import '../compile_time_constants.dart' show ConstantCompiler;
 import '../compiler.dart' show Compiler;
 import '../constants/expressions.dart'
@@ -36,6 +36,8 @@ import '../elements/modelx.dart'
         ParameterMetadataAnnotation,
         SetterElementX,
         TypedefElementX;
+import '../enqueue.dart';
+import '../options.dart';
 import '../tokens/token.dart'
     show
         isBinaryOperator,
@@ -48,6 +50,7 @@ import '../universe/call_structure.dart' show CallStructure;
 import '../universe/use.dart' show StaticUse, TypeUse;
 import '../universe/world_impact.dart' show WorldImpact;
 import '../util/util.dart' show Link, Setlet;
+import '../world.dart';
 import 'class_hierarchy.dart';
 import 'class_members.dart' show MembersCreator;
 import 'constructors.dart';
@@ -59,23 +62,31 @@ import 'typedefs.dart';
 
 class ResolverTask extends CompilerTask {
   final ConstantCompiler constantCompiler;
-  final Compiler compiler;
+  final DiagnosticReporter reporter;
+  final Resolution resolution;
+  final ParsingContext parsingContext;
+  final CoreClasses coreClasses;
+  final CoreTypes coreTypes;
+  final Target target;
+  final CompilerOptions options;
+  final World world;
+  final ResolutionEnqueuer enqueuer;
 
-  ResolverTask(Compiler compiler, this.constantCompiler)
-      : compiler = compiler,
-        super(compiler.measurer);
+  ResolverTask(
+      this.constantCompiler,
+      this.reporter,
+      this.resolution,
+      this.parsingContext,
+      this.coreClasses,
+      this.coreTypes,
+      this.target,
+      this.options,
+      this.world,
+      this.enqueuer,
+      Measurer measurer)
+      : super(measurer);
 
   String get name => 'Resolver';
-
-  DiagnosticReporter get reporter => compiler.reporter;
-
-  Resolution get resolution => compiler.resolution;
-
-  ParsingContext get parsingContext => compiler.parsingContext;
-
-  CoreClasses get coreClasses => compiler.coreClasses;
-
-  CoreTypes get coreTypes => compiler.coreTypes;
 
   ResolutionImpact resolve(Element element) {
     return measure(() {
@@ -113,7 +124,7 @@ class ResolverTask extends CompilerTask {
         return processMetadata(resolveTypedef(typdef));
       }
 
-      compiler.unimplemented(element, "resolve($element)");
+      reporter.internalError(element, "resolve($element) not implemented.");
     });
   }
 
@@ -205,7 +216,7 @@ class ResolverTask extends CompilerTask {
   bool _isNativeClassOrExtendsNativeClass(ClassElement classElement) {
     assert(classElement != null);
     while (classElement != null) {
-      if (compiler.backend.isNative(classElement)) return true;
+      if (target.isNative(classElement)) return true;
       classElement = classElement.superclass;
     }
     return false;
@@ -253,8 +264,7 @@ class ResolverTask extends CompilerTask {
             tree, MessageKind.FUNCTION_WITH_INITIALIZER);
       }
 
-      if (!compiler.options.analyzeSignaturesOnly ||
-          tree.isRedirectingFactory) {
+      if (!options.analyzeSignaturesOnly || tree.isRedirectingFactory) {
         // We need to analyze the redirecting factory bodies to ensure that
         // we can analyze compile-time constants.
         visitor.visit(tree.body);
@@ -270,7 +280,7 @@ class ResolverTask extends CompilerTask {
       if (enclosingClass != null) {
         // TODO(johnniwinther): Find another way to obtain mixin uses.
         Iterable<MixinApplicationElement> mixinUses =
-            compiler.world.allMixinUsesOf(enclosingClass);
+            world.allMixinUsesOf(enclosingClass);
         ClassElement mixin = enclosingClass;
         for (MixinApplicationElement mixinApplication in mixinUses) {
           checkMixinSuperUses(resolutionTree, mixinApplication, mixin);
@@ -294,7 +304,7 @@ class ResolverTask extends CompilerTask {
   WorldImpact resolveMethodElement(FunctionElementX element) {
     assert(invariant(element, element.isDeclaration));
     return reporter.withCurrentElement(element, () {
-      if (compiler.enqueuer.resolution.hasBeenProcessed(element)) {
+      if (enqueuer.hasBeenProcessed(element)) {
         // TODO(karlklose): Remove the check for [isConstructor]. [elememts]
         // should never be non-null, not even for constructors.
         assert(invariant(element, element.isConstructor,
@@ -305,7 +315,7 @@ class ResolverTask extends CompilerTask {
       if (element.isSynthesized) {
         if (element.isGenerativeConstructor) {
           ResolutionRegistry registry =
-              new ResolutionRegistry(compiler, _ensureTreeElements(element));
+              new ResolutionRegistry(this.target, _ensureTreeElements(element));
           ConstructorElement constructor = element.asFunctionElement();
           ConstructorElement target = constructor.definingConstructor;
           // Ensure the signature of the synthesized element is
@@ -327,7 +337,7 @@ class ResolverTask extends CompilerTask {
         element.computeType(resolution);
         FunctionElementX implementation = element;
         if (element.isExternal) {
-          implementation = compiler.backend.resolveExternalFunction(element);
+          implementation = target.resolveExternalFunction(element);
         }
         return resolveMethodElementImplementation(
             implementation, implementation.node);
@@ -342,8 +352,8 @@ class ResolverTask extends CompilerTask {
   /// This method should only be used by this library (or tests of
   /// this library).
   ResolverVisitor visitorFor(Element element, {bool useEnclosingScope: false}) {
-    return new ResolverVisitor(compiler, element,
-        new ResolutionRegistry(compiler, _ensureTreeElements(element)),
+    return new ResolverVisitor(
+        element, new ResolutionRegistry(target, _ensureTreeElements(element)),
         useEnclosingScope: useEnclosingScope);
   }
 
@@ -604,7 +614,7 @@ class ResolverTask extends CompilerTask {
     return _resolveTypeDeclaration(element, () {
       // TODO(johnniwinther): Store the mapping in the resolution enqueuer.
       ResolutionRegistry registry =
-          new ResolutionRegistry(compiler, _ensureTreeElements(element));
+          new ResolutionRegistry(target, _ensureTreeElements(element));
       resolveClassInternal(element, registry);
       return element.treeElements;
     });
@@ -753,7 +763,7 @@ class ResolverTask extends CompilerTask {
         // mixin application has been performed.
         // TODO(johnniwinther): Obtain the [TreeElements] for [member]
         // differently.
-        if (compiler.enqueuer.resolution.hasBeenProcessed(member)) {
+        if (enqueuer.hasBeenProcessed(member)) {
           if (member.resolvedAst.kind == ResolvedAstKind.PARSED) {
             checkMixinSuperUses(
                 member.resolvedAst.elements, mixinApplication, mixin);
@@ -1008,7 +1018,7 @@ class ResolverTask extends CompilerTask {
           node.parameters,
           node.returnType,
           element,
-          new ResolutionRegistry(compiler, _ensureTreeElements(element)),
+          new ResolutionRegistry(target, _ensureTreeElements(element)),
           defaultValuesError: defaultValuesError,
           createRealParameters: true));
     });
@@ -1016,10 +1026,10 @@ class ResolverTask extends CompilerTask {
 
   WorldImpact resolveTypedef(TypedefElementX element) {
     if (element.isResolved) return const ResolutionImpact();
-    compiler.world.allTypedefs.add(element);
+    world.allTypedefs.add(element);
     return _resolveTypeDeclaration(element, () {
       ResolutionRegistry registry =
-          new ResolutionRegistry(compiler, _ensureTreeElements(element));
+          new ResolutionRegistry(target, _ensureTreeElements(element));
       return reporter.withCurrentElement(element, () {
         return measure(() {
           assert(element.resolutionState == STATE_NOT_STARTED);
