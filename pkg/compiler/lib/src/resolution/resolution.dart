@@ -62,24 +62,14 @@ import 'typedefs.dart';
 
 class ResolverTask extends CompilerTask {
   final ConstantCompiler constantCompiler;
-  final DiagnosticReporter reporter;
   final Resolution resolution;
-  final ParsingContext parsingContext;
-  final CoreClasses coreClasses;
-  final CoreTypes coreTypes;
-  final Target target;
   final CompilerOptions options;
   final World world;
   final ResolutionEnqueuer enqueuer;
 
   ResolverTask(
       this.constantCompiler,
-      this.reporter,
       this.resolution,
-      this.parsingContext,
-      this.coreClasses,
-      this.coreTypes,
-      this.target,
       this.options,
       this.world,
       this.enqueuer,
@@ -87,6 +77,12 @@ class ResolverTask extends CompilerTask {
       : super(measurer);
 
   String get name => 'Resolver';
+
+  DiagnosticReporter get reporter => resolution.reporter;
+  Target get target => resolution.target;
+  CoreTypes get coreTypes => resolution.coreTypes;
+  CoreClasses get coreClasses => resolution.coreClasses;
+  ParsingContext get parsingContext => resolution.parsingContext;
 
   ResolutionImpact resolve(Element element) {
     return measure(() {

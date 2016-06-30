@@ -17,11 +17,12 @@ import 'scope.dart' show Scope;
 import 'type_resolver.dart' show TypeResolver;
 
 class CommonResolverVisitor<R> extends Visitor<R> {
-  final DiagnosticReporter reporter;
   final Resolution resolution;
   final ResolutionEnqueuer enqueuer;
 
-  CommonResolverVisitor(this.reporter, this.resolution, this.enqueuer);
+  CommonResolverVisitor(this.resolution, this.enqueuer);
+
+  DiagnosticReporter get reporter => resolution.reporter;
 
   R visitNode(Node node) {
     return reporter.internalError(
@@ -56,13 +57,11 @@ abstract class MappingVisitor<T> extends CommonResolverVisitor<T> {
 
   MappingVisitor(
       this.registry,
-      DiagnosticReporter reporter,
       Resolution resolution,
       ResolutionEnqueuer enqueuer,
-      ResolverTask resolver,
-      Types types)
-      : typeResolver = new TypeResolver(reporter, resolution, resolver, types),
-        super(reporter, resolution, enqueuer);
+      ResolverTask resolver)
+      : typeResolver = new TypeResolver(resolution, resolver),
+        super(resolution, enqueuer);
 
   AsyncMarker get currentAsyncMarker => AsyncMarker.SYNC;
 

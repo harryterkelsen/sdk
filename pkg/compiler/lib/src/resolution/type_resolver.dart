@@ -27,12 +27,13 @@ import 'resolution_common.dart' show MappingVisitor;
 import 'scope.dart' show Scope;
 
 class TypeResolver {
-  final DiagnosticReporter reporter;
   final Resolution resolution;
   final ResolverTask resolver;
-  final Types types;
 
-  TypeResolver(this.reporter, this.resolution, this.resolver, this.types);
+  TypeResolver(this.resolution, this.resolver);
+
+  DiagnosticReporter get reporter => resolution.reporter;
+  Types get types => resolution.types;
 
   /// Tries to resolve the type name as an element.
   Element resolveTypeName(

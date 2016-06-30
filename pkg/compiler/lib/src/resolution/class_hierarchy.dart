@@ -34,13 +34,13 @@ class TypeDefinitionVisitor extends MappingVisitor<DartType> {
   final TypeDeclarationElement enclosingElement;
   TypeDeclarationElement get element => enclosingElement;
 
-  TypeDefinitionVisitor(Compiler compiler, TypeDeclarationElement element,
+  TypeDefinitionVisitor(TypeDeclarationElement element,
       ResolutionRegistry registry)
       : this.enclosingElement = element,
         scope = Scope.buildEnclosingScope(element),
-        super(compiler, registry);
+        super(registry, resolution, enqueuer, resolver);
 
-  CoreTypes get coreTypes => compiler.coreTypes;
+  CoreTypes get coreTypes => resolution.coreTypes;
 
   DartType get objectType => coreTypes.objectType;
 
@@ -243,7 +243,7 @@ class ClassResolverVisitor extends TypeDefinitionVisitor {
     }
 
     EnumCreator creator =
-        new EnumCreator(reporter, compiler.coreTypes, element);
+        new EnumCreator(reporter, resolution.coreTypes, element);
     creator.createMembers();
     return enumType;
   }
@@ -545,7 +545,7 @@ class ClassResolverVisitor extends TypeDefinitionVisitor {
               reporter: reporter, objectType: coreTypes.objectType)
           .createOrderedTypeSet(supertype, cls.interfaces);
     } else {
-      assert(cls == compiler.coreClasses.objectClass);
+      assert(cls == resolution.coreClasses.objectClass);
       cls.allSupertypesAndSelf =
           new OrderedTypeSet.singleton(cls.computeType(resolution));
     }

@@ -3043,7 +3043,7 @@ class ResolverVisitor extends MappingVisitor<ResolutionResult> {
   // TODO(johnniwinther): Move this to the backend resolution callbacks.
   void handleForeignCall(
       Send node, Element target, CallStructure callStructure) {
-    if (target != null && compiler.backend.isForeign(target)) {
+    if (target != null && resolution.target.isForeign(target)) {
       registry.registerForeignCall(node, target, callStructure, this);
     }
   }
