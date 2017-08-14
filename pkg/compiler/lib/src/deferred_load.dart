@@ -456,7 +456,7 @@ class DeferredLoadTask extends CompilerTask {
       ClassElement cls = element.declaration;
       cls.implementation.forEachMember(addLiveInstanceMember);
       for (ResolutionInterfaceType type in cls.implementation.allSupertypes) {
-        elements.add(type.element.implementation);
+        collectTypeDependencies(type);
       }
       elements.add(cls.implementation);
     } else if (Elements.isStaticOrTopLevel(element) || element.isConstructor) {

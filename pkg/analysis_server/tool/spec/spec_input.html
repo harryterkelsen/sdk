@@ -7,7 +7,7 @@
 <body>
 <h1>Analysis Server API Specification</h1>
 <h1 style="color:#999999">Version
-  <version>1.18.3</version>
+  <version>1.18.4</version>
 </h1>
 <p>
   This document contains a specification of the API provided by the
@@ -948,7 +948,7 @@
       </field>
     </params>
   </notification>
-  <notification event="closingLabels">
+  <notification event="closingLabels" experimental="true">
     <p>
       Reports closing labels relevant to a given file.
     </p>
@@ -2541,6 +2541,12 @@
       Return the list of <tt>KytheEntry</tt> objects for some file, given the
       current state of the file system populated by "analysis.updateContent".
     </p>
+    <p>
+      If a request is made for a file that does not exist, or that is not
+      currently subject to analysis (e.g. because it is not associated with any
+      analysis root specified to analysis.setAnalysisRoots), an error of type
+      <tt>GET_KYTHE_ENTRIES_INVALID_FILE</tt> will be generated.
+    </p>
     <params>
       <field name="file">
         <ref>FilePath</ref>
@@ -3222,6 +3228,13 @@
         <p>
           An "analysis.getImportedElements" request specified a FilePath that
           does not match a file currently subject to analysis.
+        </p>
+      </value>
+      <value>
+        <code>GET_KYTHE_ENTRIES_INVALID_FILE</code>
+        <p>
+          An "analysis.getKytheEntries" request specified a FilePath that does
+          not match a file that is currently subject to analysis.
         </p>
       </value>
       <value>
