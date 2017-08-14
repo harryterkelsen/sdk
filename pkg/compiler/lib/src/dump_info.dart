@@ -193,7 +193,7 @@ class ElementInfoCollector {
           fieldInfo.parent = classInfo;
         }
       } else {
-        throw new StateError("Class member not a function or field");
+        throw new StateError('Class member not a function or field');
       }
     });
 
