@@ -165,6 +165,7 @@ class ElementInfoCollector {
 
   ClassInfo visitClass(ClassEntity clazz) {
     // Omit element if it is not needed.
+    if (!(clazz as ClassElement).isResolved) return null;
 
     ClassInfo classInfo = new ClassInfo(
         name: clazz.name,
