@@ -165,7 +165,6 @@ class ElementInfoCollector {
 
   ClassInfo visitClass(ClassEntity clazz) {
     // Omit element if it is not needed.
-    if (!compiler.backend.emitter.neededClasses.contains(clazz)) return null;
 
     ClassInfo classInfo = new ClassInfo(
         name: clazz.name,
@@ -451,11 +450,9 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     impacts.remove(impactSource);
   }
 
-  /**
-   * Returns an iterable of [Selection]s that are used by
-   * [element].  Each [Selection] contains an element that is
-   * used and the selector that selected the element.
-   */
+  /// Returns an iterable of [Selection]s that are used by [element]. Each
+  /// [Selection] contains an element that is used and the selector that
+  /// selected the element.
   Iterable<Selection> getRetaining(Element element, ClosedWorld closedWorld) {
     WorldImpact impact = impacts[element];
     if (impact == null) return const <Selection>[];
