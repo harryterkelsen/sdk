@@ -5889,15 +5889,16 @@ Dart_CompileToKernel(const char* script_uri) {
 DART_EXPORT Dart_KernelCompilationResult
 Dart_CompileSourcesToKernel(const char* script_uri,
                             int source_files_count,
-                            Dart_SourceFile sources[]) {
+                            Dart_SourceFile sources[],
+                            bool incremental_compile) {
 #ifdef DART_PRECOMPILED_RUNTIME
   Dart_KernelCompilationResult result;
   result.status = Dart_KernelCompilationStatus_Unknown;
   result.error = strdup("Dart_CompileSourcesToKernel is unsupported.");
   return result;
 #else
-  return KernelIsolate::CompileToKernel(script_uri, source_files_count,
-                                        sources);
+  return KernelIsolate::CompileToKernel(script_uri, source_files_count, sources,
+                                        incremental_compile);
 #endif
 }
 
@@ -5928,6 +5929,11 @@ DART_EXPORT void Dart_RegisterRootServiceRequestCallback(
     const char* name,
     Dart_ServiceRequestCallback callback,
     void* user_data) {
+  return;
+}
+
+DART_EXPORT void Dart_SetEmbedderInformationCallback(
+    Dart_EmbedderInformationCallback callback) {
   return;
 }
 
@@ -5993,6 +5999,13 @@ DART_EXPORT void Dart_RegisterRootServiceRequestCallback(
     void* user_data) {
   if (FLAG_support_service) {
     Service::RegisterRootEmbedderCallback(name, callback, user_data);
+  }
+}
+
+DART_EXPORT void Dart_SetEmbedderInformationCallback(
+    Dart_EmbedderInformationCallback callback) {
+  if (FLAG_support_service) {
+    Service::SetEmbedderInformationCallback(callback);
   }
 }
 
