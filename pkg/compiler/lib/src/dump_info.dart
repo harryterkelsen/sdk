@@ -60,9 +60,9 @@ class ElementInfoCollector {
 
   /// Whether to emit information about [entity].
   ///
-  /// By default we emit information for any element that contributes to the
-  /// output size. Either because the it is a function being emitted or inlined,
-  /// or because it is an element that holds dependencies to other elements.
+  /// By default we emit information for any entity that contributes to the
+  /// output size. Either because it is a function being emitted or inlined,
+  /// or because it is an entity that holds dependencies to other entities.
   bool shouldKeep(Entity entity) {
     return compiler.dumpInfoTask.impacts.containsKey(entity) ||
         compiler.dumpInfoTask.inlineCount.containsKey(entity);
@@ -159,7 +159,7 @@ class ElementInfoCollector {
     }
 
     if (JavaScriptBackend.TRACE_METHOD == 'post') {
-      // We use element.hashCode because it is globally unique and it is
+      // We use field.hashCode because it is globally unique and it is
       // available while we are doing codegen.
       info.coverageId = '${field.hashCode}';
     }
@@ -172,7 +172,7 @@ class ElementInfoCollector {
   }
 
   ClassInfo visitClass(ClassEntity clazz) {
-    // Omit element if it is not needed.
+    // Omit class if it is not needed.
     if (!closedWorld.isInstantiated(clazz)) return null;
 
     ClassInfo classInfo = new ClassInfo(
@@ -297,15 +297,15 @@ class ElementInfoCollector {
         outputUnit: _unitInfoForEntity(function));
     _entityToInfo[function] = info;
 
-    if (function is MemberElement) {
-      int closureSize = _addClosureInfo(info, function as MemberElement);
+    if (function.isInstanceMember) {
+      int closureSize = _addClosureInfo(info, function);
       size += closureSize;
     } else {
       info.closures = <ClosureInfo>[];
     }
 
     if (JavaScriptBackend.TRACE_METHOD == 'post') {
-      // We use element.hashCode because it is globally unique and it is
+      // We use function.hashCode because it is globally unique and it is
       // available while we are doing codegen.
       info.coverageId = '${function.hashCode}';
     }
@@ -356,7 +356,7 @@ class ElementInfoCollector {
 
   OutputUnitInfo _unitInfoForEntity(Entity entity) {
     return _infoFromOutputUnit(
-        compiler.deferredLoadTask.outputUnitForElement(entity));
+        compiler.deferredLoadTask.outputUnitForEntity(entity));
   }
 
   OutputUnitInfo _unitInfoForConstant(ConstantValue constant) {
@@ -371,9 +371,9 @@ class ElementInfoCollector {
 }
 
 class Selection {
-  final Entity selectedElement;
+  final Entity selectedEntity;
   final ReceiverConstraint mask;
-  Selection(this.selectedElement, this.mask);
+  Selection(this.selectedEntity, this.mask);
 }
 
 /// Interface used to record information from different parts of the compiler so
@@ -402,11 +402,11 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
   int _programSize;
 
   // A set of javascript AST nodes that we care about the size of.
-  // This set is automatically populated when registerElementAst()
+  // This set is automatically populated when registerEntityAst()
   // is called.
   final Set<jsAst.Node> _tracking = new Set<jsAst.Node>();
 
-  // A mapping from Dart Elements to Javascript AST Nodes.
+  // A mapping from Dart Entities to Javascript AST Nodes.
   final Map<Entity, List<jsAst.Node>> _entityToNodes =
       <Entity, List<jsAst.Node>>{};
   final Map<ConstantValue, jsAst.Node> _constantToNode =
@@ -439,9 +439,9 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     inlineMap[inlinedFrom].add(element);
   }
 
-  void registerImpact(MemberEntity element, WorldImpact impact) {
+  void registerImpact(MemberEntity member, WorldImpact impact) {
     if (compiler.options.dumpInfo) {
-      impacts[element] = impact;
+      impacts[member] = impact;
     }
   }
 
@@ -449,16 +449,16 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     impacts.remove(impactSource);
   }
 
-  /// Returns an iterable of [Selection]s that are used by [element]. Each
-  /// [Selection] contains an element that is used and the selector that
-  /// selected the element.
-  Iterable<Selection> getRetaining(Element element, ClosedWorld closedWorld) {
-    WorldImpact impact = impacts[element];
+  /// Returns an iterable of [Selection]s that are used by [entity]. Each
+  /// [Selection] contains an entity that is used and the selector that
+  /// selected the entity.
+  Iterable<Selection> getRetaining(Entity entity, ClosedWorld closedWorld) {
+    WorldImpact impact = impacts[entity];
     if (impact == null) return const <Selection>[];
 
     var selections = <Selection>[];
     compiler.impactStrategy.visitImpact(
-        element,
+        entity,
         impact,
         new WorldImpactVisitorImpl(visitDynamicUse: (dynamicUse) {
           selections.addAll(closedWorld
@@ -481,12 +481,12 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     }
   }
 
-  // Registers that a javascript AST node `code` was produced by the
-  // dart Element `element`.
-  void registerElementAst(Entity element, jsAst.Node code) {
+  /// Registers that a javascript AST node [code] was produced by the dart
+  /// Entity [entity].
+  void registerEntityAst(Entity entity, jsAst.Node code) {
     if (compiler.options.dumpInfo) {
       _entityToNodes
-          .putIfAbsent(element, () => new List<jsAst.Node>())
+          .putIfAbsent(entity, () => new List<jsAst.Node>())
           .add(code);
       _tracking.add(code);
     }
@@ -501,8 +501,8 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     }
   }
 
-  // Records the size of a dart AST node after it has been
-  // pretty-printed into the output buffer.
+  /// Records the size of a dart AST node after it has been pretty-printed into
+  /// the output buffer.
   void recordAstSize(jsAst.Node node, int size) {
     if (isTracking(node)) {
       //TODO: should I be incrementing here instead?
@@ -510,9 +510,8 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     }
   }
 
-  // Returns the size of the source code that
-  // was generated for an element.  If no source
-  // code was produced, return 0.
+  /// Returns the size of the source code that was generated for an entity.
+  /// If no source code was produced, return 0.
   int sizeOf(Entity entity) {
     if (_entityToNodes.containsKey(entity)) {
       return _entityToNodes[entity].map(sizeOfNode).fold(0, (a, b) => a + b);
@@ -558,29 +557,29 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     AllInfo result = infoCollector.result;
 
     // Recursively build links to function uses
-    Iterable<Entity> functionElements =
-        infoCollector._entityToInfo.keys.where((k) => k is FunctionElement);
-    for (FunctionElement element in functionElements) {
-      FunctionInfo info = infoCollector._entityToInfo[element];
-      Iterable<Selection> uses = getRetaining(element, closedWorld);
+    Iterable<FunctionEntity> functionEntities =
+        infoCollector._entityToInfo.keys.where((k) => k is FunctionEntity);
+    for (FunctionEntity entity in functionEntities) {
+      FunctionInfo info = infoCollector._entityToInfo[entity];
+      Iterable<Selection> uses = getRetaining(entity, closedWorld);
       // Don't bother recording an empty list of dependencies.
       for (Selection selection in uses) {
         // Don't register dart2js builtin functions that are not recorded.
-        Info useInfo = infoCollector._entityToInfo[selection.selectedElement];
+        Info useInfo = infoCollector._entityToInfo[selection.selectedEntity];
         if (useInfo == null) continue;
         info.uses.add(new DependencyInfo(useInfo, '${selection.mask}'));
       }
     }
 
     // Recursively build links to field uses
-    Iterable<Entity> fieldElements =
-        infoCollector._entityToInfo.keys.where((k) => k is FieldElement);
-    for (FieldElement element in fieldElements) {
-      FieldInfo info = infoCollector._entityToInfo[element];
-      Iterable<Selection> uses = getRetaining(element, closedWorld);
+    Iterable<FieldEntity> fieldEntity =
+        infoCollector._entityToInfo.keys.where((k) => k is FieldEntity);
+    for (FieldEntity entity in fieldEntity) {
+      FieldInfo info = infoCollector._entityToInfo[entity];
+      Iterable<Selection> uses = getRetaining(entity, closedWorld);
       // Don't bother recording an empty list of dependencies.
       for (Selection selection in uses) {
-        Info useInfo = infoCollector._entityToInfo[selection.selectedElement];
+        Info useInfo = infoCollector._entityToInfo[selection.selectedEntity];
         if (useInfo == null) continue;
         info.uses.add(new DependencyInfo(useInfo, '${selection.mask}'));
       }
@@ -590,10 +589,10 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     compiler.impactStrategy.onImpactUsed(IMPACT_USE);
 
     // Track dependencies that come from inlining.
-    for (Element element in inlineMap.keys) {
-      CodeInfo outerInfo = infoCollector._entityToInfo[element];
+    for (Entity entity in inlineMap.keys) {
+      CodeInfo outerInfo = infoCollector._entityToInfo[entity];
       if (outerInfo == null) continue;
-      for (Element inlined in inlineMap[element]) {
+      for (Entity inlined in inlineMap[entity]) {
         Info inlinedInfo = infoCollector._entityToInfo[inlined];
         if (inlinedInfo == null) continue;
         outerInfo.uses.add(new DependencyInfo(inlinedInfo, 'inlined'));

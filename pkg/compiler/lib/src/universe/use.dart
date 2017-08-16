@@ -86,7 +86,7 @@ enum StaticUseKind {
   INLINING,
 }
 
-/// Statically known use of an [Element].
+/// Statically known use of an [Entity].
 // TODO(johnniwinther): Create backend-specific implementations with better
 // invariants.
 class StaticUse {
