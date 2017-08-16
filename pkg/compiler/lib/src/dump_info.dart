@@ -21,7 +21,11 @@ import 'elements/elements.dart';
 import 'elements/entities.dart';
 import 'js/js.dart' as jsAst;
 import 'js_backend/js_backend.dart' show JavaScriptBackend;
-import 'types/types.dart' show TypeMask;
+import 'types/types.dart'
+    show
+        GlobalTypeInferenceElementResult,
+        GlobalTypeInferenceMemberResult,
+        TypeMask;
 import 'universe/world_builder.dart' show ReceiverConstraint;
 import 'universe/world_impact.dart'
     show ImpactUseCase, WorldImpact, WorldImpactVisitorImpl;
@@ -122,10 +126,10 @@ class ElementInfoCollector {
     return info;
   }
 
-  _resultOfMember(MemberEntity e) =>
+  GlobalTypeInferenceMemberResult _resultOfMember(MemberEntity e) =>
       compiler.globalInference.results.resultOfMember(e);
 
-  _resultOfParameter(Local e) =>
+  GlobalTypeInferenceElementResult _resultOfParameter(Local e) =>
       compiler.globalInference.results.resultOfParameter(e);
 
   FieldInfo visitField(FieldEntity field) {
@@ -236,55 +240,45 @@ class ElementInfoCollector {
 
     // TODO(het): use 'toString' instead of 'text'? It will add '=' for setters
     String name = function.memberName.text;
-    int kind = FunctionInfo.TOP_LEVEL_FUNCTION_KIND;
-    var enclosingElement = function.enclosingElement;
-    if (enclosingElement.isField ||
-        enclosingElement.isFunction ||
-        function.isClosure ||
-        enclosingElement.isConstructor) {
-      kind = FunctionInfo.CLOSURE_FUNCTION_KIND;
-      name = "<unnamed>";
-    } else if (function.isStatic) {
+    int kind;
+    if (function.isStatic || function.isTopLevel) {
       kind = FunctionInfo.TOP_LEVEL_FUNCTION_KIND;
-    } else if (enclosingElement.isClass) {
+    } else if (function.enclosingClass != null) {
       kind = FunctionInfo.METHOD_FUNCTION_KIND;
     }
 
     if (function.isConstructor) {
       name = name == ""
-          ? "${function.enclosingElement.name}"
-          : "${function.enclosingElement.name}.${function.name}";
+          ? "${function.enclosingClass.name}"
+          : "${function.enclosingClass.name}.${function.name}";
       kind = FunctionInfo.CONSTRUCTOR_FUNCTION_KIND;
     }
 
+    assert(kind != null);
+
     FunctionModifiers modifiers = new FunctionModifiers(
-        isStatic: function.isStatic,
-        isConst: function.isConst,
-        isFactory: function.isFactoryConstructor,
-        isExternal: function.isPatched);
+      isStatic: function.isStatic,
+      isConst: function.isConst,
+      isFactory: function.isConstructor
+          ? (function as ConstructorEntity).isFactoryConstructor
+          : false,
+      isExternal: function.isExternal,
+    );
     String code = compiler.dumpInfoTask.codeOf(function);
 
-    String returnType = null;
+    String returnType;
     List<ParameterInfo> parameters = <ParameterInfo>[];
-    if (function.hasFunctionSignature) {
-      FunctionElement implementation = function.implementation;
-      FunctionSignature signature = implementation.functionSignature;
-      signature.forEachParameter((parameter) {
-        parameters.add(new ParameterInfo(parameter.name,
-            '${_resultOfParameter(parameter).type}', '${parameter.node.type}'));
-      });
-      returnType = '${function.type.returnType}';
-    }
+    var functionType = environment.getFunctionType(function);
+    // TODO(het): Find a better way to do this
+    compiler.globalInference.typesInferrerInternal.inferrer.types.strategy
+        .forEachParameter(function, (Local parameter) {
+      parameters.add(new ParameterInfo(parameter.name,
+          '${_resultOfParameter(parameter).type}', '${parameter.node.type}'));
+    });
+    returnType = '${functionType.returnType}';
 
-    MethodElement method;
-    if (function is LocalFunctionElement) {
-      method = function.callMethod;
-    } else {
-      method = function;
-    }
-
-    String inferredReturnType = '${_resultOfMember(method).returnType}';
-    String sideEffects = '${closedWorld.getSideEffectsOfElement(method)}';
+    String inferredReturnType = '${_resultOfMember(function).returnType}';
+    String sideEffects = '${closedWorld.getSideEffectsOfElement(function)}';
 
     int inlinedCount = compiler.dumpInfoTask.inlineCount[function];
     if (inlinedCount == null) inlinedCount = 0;
@@ -299,7 +293,7 @@ class ElementInfoCollector {
         sideEffects: sideEffects,
         inlinedCount: inlinedCount,
         code: code,
-        type: function.type.toString(),
+        type: functionType.toString(),
         outputUnit: _unitInfoForEntity(function));
     _entityToInfo[function] = info;
 
