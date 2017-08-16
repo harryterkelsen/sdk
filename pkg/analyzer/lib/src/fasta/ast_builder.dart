@@ -37,6 +37,10 @@ class AstBuilder extends ScopeListener {
   final KernelLibraryBuilder library;
   final Builder member;
 
+  ScriptTag scriptTag;
+  final List<Directive> directives = <Directive>[];
+  final List<CompilationUnitMember> declarations = <CompilationUnitMember>[];
+
   @override
   final Uri uri;
 
@@ -170,7 +174,7 @@ class AstBuilder extends ScopeListener {
 
   void handleScript(Token token) {
     debugEvent("Script");
-    push(ast.scriptTag(token));
+    scriptTag = ast.scriptTag(token);
   }
 
   void handleStringJuxtaposition(int literalCount) {
@@ -1108,7 +1112,7 @@ class AstBuilder extends ScopeListener {
     Token externalKeyword = modifiers?.externalKeyword;
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.functionDeclaration(
+    declarations.add(ast.functionDeclaration(
         comment,
         metadata,
         externalKeyword,
@@ -1124,6 +1128,15 @@ class AstBuilder extends ScopeListener {
   }
 
   @override
+  void handleInvalidTopLevelDeclaration(Token endToken) {
+    debugEvent("InvalidTopLevelDeclaration");
+    pop(); // metadata star
+    // TODO(danrubel): consider creating a AST node
+    // representing the invalid declaration to better support code completion,
+    // quick fixes, etc, rather than discarding the metadata and token
+  }
+
+  @override
   void beginCompilationUnit(Token token) {
     push(token);
   }
@@ -1131,26 +1144,8 @@ class AstBuilder extends ScopeListener {
   @override
   void endCompilationUnit(int count, Token endToken) {
     debugEvent("CompilationUnit");
-    List<Object> elements = popList(count);
     Token beginToken = pop();
-
-    ScriptTag scriptTag = null;
-    var directives = <Directive>[];
-    var declarations = <CompilationUnitMember>[];
-    if (elements != null) {
-      for (AstNode node in elements) {
-        if (node is ScriptTag) {
-          scriptTag = node;
-        } else if (node is Directive) {
-          directives.add(node);
-        } else if (node is CompilationUnitMember) {
-          declarations.add(node);
-        } else {
-          unhandled(
-              "${node.runtimeType}", "compilation unit", node?.offset, uri);
-        }
-      }
-    }
+    checkEmpty(endToken.charOffset);
 
     push(ast.compilationUnit(
         beginToken, scriptTag, directives, declarations, endToken));
@@ -1167,7 +1162,7 @@ class AstBuilder extends ScopeListener {
     List<Annotation> metadata = pop();
     assert(metadata == null); // TODO(paulberry): fix.
     Comment comment = pop();
-    push(ast.importDirective(
+    directives.add(ast.importDirective(
         comment,
         metadata,
         importKeyword,
@@ -1188,7 +1183,7 @@ class AstBuilder extends ScopeListener {
     List<Annotation> metadata = pop();
     assert(metadata == null);
     Comment comment = pop();
-    push(ast.exportDirective(comment, metadata, exportKeyword, uri,
+    directives.add(ast.exportDirective(comment, metadata, exportKeyword, uri,
         configurations, combinators, semicolon));
   }
 
@@ -1319,7 +1314,7 @@ class AstBuilder extends ScopeListener {
     Token abstractKeyword = modifiers?.abstractKeyword;
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.classDeclaration(
+    declarations.add(ast.classDeclaration(
         comment,
         metadata,
         abstractKeyword,
@@ -1362,7 +1357,7 @@ class AstBuilder extends ScopeListener {
     Token abstractKeyword = modifiers?.abstractKeyword;
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.classTypeAlias(
+    declarations.add(ast.classTypeAlias(
         comment,
         metadata,
         classKeyword,
@@ -1391,7 +1386,7 @@ class AstBuilder extends ScopeListener {
     var name = ast.libraryIdentifier(libraryName);
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.libraryDirective(
+    directives.add(ast.libraryDirective(
         comment, metadata, libraryKeyword, name, semicolon));
   }
 
@@ -1419,7 +1414,8 @@ class AstBuilder extends ScopeListener {
     StringLiteral uri = pop();
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.partDirective(comment, metadata, partKeyword, uri, semicolon));
+    directives
+        .add(ast.partDirective(comment, metadata, partKeyword, uri, semicolon));
   }
 
   @override
@@ -1433,7 +1429,7 @@ class AstBuilder extends ScopeListener {
     var ofKeyword = partKeyword.next;
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.partOfDirective(
+    directives.add(ast.partOfDirective(
         comment, metadata, partKeyword, ofKeyword, uri, name, semicolon));
   }
 
@@ -1560,7 +1556,7 @@ class AstBuilder extends ScopeListener {
         ast.variableDeclarationList(null, null, keyword, type, variables);
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.topLevelVariableDeclaration(
+    declarations.add(ast.topLevelVariableDeclaration(
         comment, metadata, variableList, endToken));
   }
 
@@ -1674,8 +1670,8 @@ class AstBuilder extends ScopeListener {
       TypeAnnotation returnType = pop();
       List<Annotation> metadata = pop();
       Comment comment = pop();
-      push(ast.functionTypeAlias(comment, metadata, typedefKeyword, returnType,
-          name, typeParameters, parameters, endToken));
+      declarations.add(ast.functionTypeAlias(comment, metadata, typedefKeyword,
+          returnType, name, typeParameters, parameters, endToken));
     } else {
       TypeAnnotation type = pop();
       TypeParameterList templateParameters = pop();
@@ -1687,8 +1683,8 @@ class AstBuilder extends ScopeListener {
         // this).
         type = null;
       }
-      push(ast.genericTypeAlias(comment, metadata, typedefKeyword, name,
-          templateParameters, equals, type, endToken));
+      declarations.add(ast.genericTypeAlias(comment, metadata, typedefKeyword,
+          name, templateParameters, equals, type, endToken));
     }
   }
 
@@ -1704,8 +1700,8 @@ class AstBuilder extends ScopeListener {
     SimpleIdentifier name = pop();
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    push(ast.enumDeclaration(comment, metadata, enumKeyword, name, openBrace,
-        constants, closeBrace));
+    declarations.add(ast.enumDeclaration(comment, metadata, enumKeyword, name,
+        openBrace, constants, closeBrace));
   }
 
   @override
@@ -1738,7 +1734,7 @@ class AstBuilder extends ScopeListener {
   @override
   AstNode finishFields() {
     debugEvent("finishFields");
-    return pop();
+    return declarations.removeLast();
   }
 
   @override
@@ -1767,6 +1763,12 @@ class AstBuilder extends ScopeListener {
     Identifier name = pop();
     push(ast.annotation(beginToken, name, periodBeforeName, constructorName,
         invocation?.argumentList));
+  }
+
+  @override
+  void endMetadataStar(int count, bool forParameter) {
+    debugEvent("MetadataStar");
+    push(popList(count) ?? NullValue.Metadata);
   }
 
   ParameterKind _toAnalyzerParameterKind(FormalParameterKind type) {
