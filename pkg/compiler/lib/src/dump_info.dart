@@ -107,9 +107,13 @@ class ElementInfoCollector {
   }
 
   TypedefInfo visitTypedef(TypedefEntity typdef) {
+    // TODO(het): find out if this is necessary or if all typedefs that reach
+    // here are resolved
     if (!typdef.isResolved) return null;
-    TypedefInfo info = new TypedefInfo(
-        typdef.name, '${typdef.alias}', _unitInfoForEntity(typdef));
+
+    var type = environment.getFunctionTypeOfTypedef(typdef);
+    TypedefInfo info =
+        new TypedefInfo(typdef.name, '$type', _unitInfoForEntity(typdef));
     _entityToInfo[typdef] = info;
     LibraryInfo lib = _entityToInfo[typdef.library];
     lib.typedefs.add(info);
@@ -165,7 +169,7 @@ class ElementInfoCollector {
 
   ClassInfo visitClass(ClassEntity clazz) {
     // Omit element if it is not needed.
-    if (!(clazz as ClassElement).isResolved) return null;
+    if (!closedWorld.isInstantiated(clazz)) return null;
 
     ClassInfo classInfo = new ClassInfo(
         name: clazz.name,
@@ -529,8 +533,8 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     return size == null ? 0 : size;
   }
 
-  String codeOf(Element element) {
-    List<jsAst.Node> code = _entityToNodes[element];
+  String codeOf(Entity entity) {
+    List<jsAst.Node> code = _entityToNodes[entity];
     if (code == null) return null;
     // Concatenate rendered ASTs.
     StringBuffer sb = new StringBuffer();
