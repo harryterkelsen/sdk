@@ -212,11 +212,11 @@ class DeferredLoadTask extends CompilerTask {
     return _constantToOutputUnit;
   }
 
-  bool isDeferred(Element element) {
+  bool isDeferred(Entity element) {
     return outputUnitForEntity(element) != mainOutputUnit;
   }
 
-  bool isDeferredClass(ClassElement element) {
+  bool isDeferredClass(ClassEntity element) {
     return outputUnitForEntity(element) != mainOutputUnit;
   }
 
