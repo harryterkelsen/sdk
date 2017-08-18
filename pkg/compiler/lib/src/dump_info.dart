@@ -144,7 +144,7 @@ class ElementInfoCollector {
 
     FieldInfo info = new FieldInfo(
         name: field.name,
-        type: '${field.type}',
+        type: '${environment.getFieldType(field)}',
         inferredType: '$inferredType',
         code: code,
         outputUnit: _unitInfoForEntity(field),
@@ -152,7 +152,7 @@ class ElementInfoCollector {
     _entityToInfo[field] = info;
     if (field.isConst) {
       var value = compiler.backend.constantCompilerTask
-          .getConstantValue(field.constant);
+          .getConstantValue(environment.getFieldConstant(field));
       if (value != null) {
         info.initializer = _constantToInfo[value];
       }
@@ -173,7 +173,7 @@ class ElementInfoCollector {
 
   ClassInfo visitClass(ClassEntity clazz) {
     // Omit class if it is not needed.
-    if (!closedWorld.isInstantiated(clazz)) return null;
+    if (!compiler.backend.emitter.neededClasses.contains(clazz)) return null;
 
     ClassInfo classInfo = new ClassInfo(
         name: clazz.name,
@@ -557,7 +557,7 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     AllInfo result = infoCollector.result;
 
     // Recursively build links to function uses
-    Iterable<FunctionEntity> functionEntities =
+    Iterable<Entity> functionEntities =
         infoCollector._entityToInfo.keys.where((k) => k is FunctionEntity);
     for (FunctionEntity entity in functionEntities) {
       FunctionInfo info = infoCollector._entityToInfo[entity];
@@ -572,7 +572,7 @@ class DumpInfoTask extends CompilerTask implements InfoReporter {
     }
 
     // Recursively build links to field uses
-    Iterable<FieldEntity> fieldEntity =
+    Iterable<Entity> fieldEntity =
         infoCollector._entityToInfo.keys.where((k) => k is FieldEntity);
     for (FieldEntity entity in fieldEntity) {
       FieldInfo info = infoCollector._entityToInfo[entity];

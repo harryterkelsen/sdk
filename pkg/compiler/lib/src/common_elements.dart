@@ -14,6 +14,7 @@ import 'elements/types.dart';
 import 'js_backend/backend.dart' show JavaScriptBackend;
 import 'js_backend/constant_system_javascript.dart';
 import 'js_backend/native_data.dart' show NativeBasicData;
+import 'constants/expressions.dart' show ConstantExpression;
 import 'universe/call_structure.dart' show CallStructure;
 import 'universe/selector.dart' show Selector;
 import 'universe/call_structure.dart';
@@ -1329,11 +1330,17 @@ abstract class ElementEnvironment {
   /// `Object`.
   DartType getTypeVariableBound(TypeVariableEntity typeVariable);
 
-  /// Returns the type if [function].
+  /// Returns the type of [function].
   FunctionType getFunctionType(FunctionEntity function);
 
   /// Returns the type of the [local] function.
   FunctionType getLocalFunctionType(Local local);
+
+  /// Returns the type of [field].
+  DartType getFieldType(FieldEntity field);
+
+  /// Gets the constant value of [field], or `null` if [field] is non-const.
+  ConstantExpression getFieldConstant(FieldEntity field);
 
   /// Returns the 'unaliased' type of [type]. For typedefs this is the function
   /// type it is an alias of, for other types it is the type itself.
