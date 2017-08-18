@@ -702,12 +702,6 @@ abstract class KernelToElementMapBase extends KernelToElementMapBaseMixin {
     return data.getFieldConstant(this, field);
   }
 
-  DartType _getFieldType(IndexedField field) {
-    assert(checkFamily(field));
-    FieldData data = _memberData[field.memberIndex];
-    return getDartType((data.definition.node as ir.Field).type);
-  }
-
   InterfaceType _asInstanceOf(InterfaceType type, ClassEntity cls) {
     assert(checkFamily(cls));
     OrderedTypeSet orderedTypeSet = _getOrderedTypeSet(type.element);
@@ -1356,11 +1350,6 @@ class KernelElementEnvironment implements ElementEnvironment {
   @override
   FunctionType getLocalFunctionType(covariant KLocalFunction function) {
     return function.functionType;
-  }
-
-  @override
-  DartType getFieldType(FieldEntity field) {
-    return elementMap._getFieldType(field);
   }
 
   @override

@@ -111,10 +111,6 @@ class ElementInfoCollector {
   }
 
   TypedefInfo visitTypedef(TypedefEntity typdef) {
-    // TODO(het): find out if this is necessary or if all typedefs that reach
-    // here are resolved
-    if (!typdef.isResolved) return null;
-
     var type = environment.getFunctionTypeOfTypedef(typdef);
     TypedefInfo info =
         new TypedefInfo(typdef.name, '$type', _unitInfoForEntity(typdef));
@@ -266,16 +262,13 @@ class ElementInfoCollector {
     );
     String code = compiler.dumpInfoTask.codeOf(function);
 
-    String returnType;
     List<ParameterInfo> parameters = <ParameterInfo>[];
-    var functionType = environment.getFunctionType(function);
-    // TODO(het): Find a better way to do this
-    compiler.globalInference.typesInferrerInternal.inferrer.types.strategy
-        .forEachParameter(function, (Local parameter) {
-      parameters.add(new ParameterInfo(parameter.name,
-          '${_resultOfParameter(parameter).type}', '${parameter.node.type}'));
+    compiler.codegenWorldBuilder.forEachParameter(function, (type, name, _) {
+      parameters.add(new ParameterInfo(name, '', '$type'));
     });
-    returnType = '${functionType.returnType}';
+
+    var functionType = environment.getFunctionType(function);
+    String returnType = '${functionType.returnType}';
 
     String inferredReturnType = '${_resultOfMember(function).returnType}';
     String sideEffects = '${closedWorld.getSideEffectsOfElement(function)}';

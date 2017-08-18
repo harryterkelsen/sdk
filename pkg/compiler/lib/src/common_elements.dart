@@ -1339,9 +1339,6 @@ abstract class ElementEnvironment {
   /// Returns the type of the [local] function.
   FunctionType getLocalFunctionType(Local local);
 
-  /// Returns the type of [field].
-  DartType getFieldType(FieldEntity field);
-
   /// Gets the constant value of [field], or `null` if [field] is non-const.
   ConstantExpression getFieldConstant(FieldEntity field);
 

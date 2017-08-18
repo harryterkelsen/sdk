@@ -681,11 +681,6 @@ class _CompilerElementEnvironment implements ElementEnvironment {
   }
 
   @override
-  DartType getFieldType(covariant FieldElement field) {
-    return field.type;
-  }
-
-  @override
   ConstantExpression getFieldConstant(covariant FieldElement field) {
     return field.constant;
   }
