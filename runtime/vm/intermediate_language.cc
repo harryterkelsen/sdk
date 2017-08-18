@@ -2,8 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-#if !defined(DART_PRECOMPILED_RUNTIME)
-
 #include "vm/intermediate_language.h"
 
 #include "vm/bit_vector.h"
@@ -44,7 +42,6 @@ DEFINE_FLAG(bool,
             !USING_DBC,
             "Support unboxed double and float32x4 fields.");
 DECLARE_FLAG(bool, eliminate_type_checks);
-DECLARE_FLAG(bool, support_externalizable_strings);
 
 #if defined(DEBUG)
 void Instruction::CheckField(const Field& field) const {
@@ -146,18 +143,6 @@ static int OrderByFrequency(CidRange* const* a, CidRange* const* b) {
   const TargetInfo* target_info_b = static_cast<const TargetInfo*>(*b);
   // Negative if 'a' should sort before 'b'.
   return target_info_b->count - target_info_a->count;
-}
-
-bool Cids::ContainsExternalizableCids() const {
-  for (intptr_t i = 0; i < length(); i++) {
-    for (intptr_t cid = cid_ranges_[i]->cid_start;
-         cid <= cid_ranges_[i]->cid_end; cid++) {
-      if (Field::IsExternalizableCid(cid)) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 bool Cids::Equals(const Cids& other) const {
@@ -289,20 +274,6 @@ bool CheckClassInstr::AttributesEqual(Instruction* other) const {
   CheckClassInstr* other_check = other->AsCheckClass();
   ASSERT(other_check != NULL);
   return cids().Equals(other_check->cids());
-}
-
-EffectSet CheckClassInstr::Dependencies() const {
-  // Externalization of strings via the API can change the class-id.
-  return cids_.ContainsExternalizableCids() ? EffectSet::Externalization()
-                                            : EffectSet::None();
-}
-
-EffectSet CheckClassIdInstr::Dependencies() const {
-  // Externalization of strings via the API can change the class-id.
-  for (intptr_t i = cids_.cid_start; i <= cids_.cid_end; i++) {
-    if (Field::IsExternalizableCid(i)) return EffectSet::Externalization();
-  }
-  return EffectSet::None();
 }
 
 bool CheckClassInstr::IsDeoptIfNull() const {
@@ -4066,5 +4037,3 @@ void NativeCallInstr::SetupNative() {
 #undef __
 
 }  // namespace dart
-
-#endif  // !defined(DART_PRECOMPILED_RUNTIME)

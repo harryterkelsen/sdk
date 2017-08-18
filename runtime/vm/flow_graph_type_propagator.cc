@@ -2,8 +2,6 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-#if !defined(DART_PRECOMPILED_RUNTIME)
-
 #include "vm/flow_graph_type_propagator.h"
 
 #include "vm/bit_vector.h"
@@ -294,8 +292,7 @@ void FlowGraphTypePropagator::VisitPolymorphicInstanceCall(
 void FlowGraphTypePropagator::VisitGuardFieldClass(
     GuardFieldClassInstr* guard) {
   const intptr_t cid = guard->field().guarded_cid();
-  if ((cid == kIllegalCid) || (cid == kDynamicCid) ||
-      Field::IsExternalizableCid(cid)) {
+  if ((cid == kIllegalCid) || (cid == kDynamicCid)) {
     return;
   }
 
@@ -856,9 +853,6 @@ CompileType ConstantInstr::ComputeType() const {
   }
 
   intptr_t cid = value().GetClassId();
-  if (Field::IsExternalizableCid(cid)) {
-    cid = kDynamicCid;
-  }
 
   if (value().IsInstance()) {
     // Allocate in old-space since this may be invoked from the
@@ -1022,9 +1016,6 @@ CompileType LoadStaticFieldInstr::ComputeType() const {
       if (!IsNullableCid(cid)) is_nullable = CompileType::kNonNullable;
     }
   }
-  if (Field::IsExternalizableCid(cid)) {
-    cid = kDynamicCid;
-  }
   return CompileType(is_nullable, cid, abstract_type);
 }
 
@@ -1061,25 +1052,16 @@ CompileType LoadFieldInstr::ComputeType() const {
 
   const AbstractType* abstract_type = NULL;
   if (Isolate::Current()->type_checks() &&
-      (type().IsFunctionType() ||
-       (type().HasResolvedTypeClass() &&
-        !Field::IsExternalizableCid(
-            Class::Handle(type().type_class()).id())))) {
+      (type().IsFunctionType() || type().HasResolvedTypeClass())) {
     abstract_type = &type();
   }
 
   if ((field_ != NULL) && (field_->guarded_cid() != kIllegalCid)) {
     bool is_nullable = field_->is_nullable();
     intptr_t field_cid = field_->guarded_cid();
-    if (Field::IsExternalizableCid(field_cid)) {
-      // We cannot assume that the type of the value in the field has not
-      // changed on the fly.
-      field_cid = kDynamicCid;
-    }
     return CompileType(is_nullable, field_cid, abstract_type);
   }
 
-  ASSERT(!Field::IsExternalizableCid(result_cid_));
   return CompileType::Create(result_cid_, *abstract_type);
 }
 
@@ -1399,5 +1381,3 @@ CompileType ExtractNthOutputInstr::ComputeType() const {
 }
 
 }  // namespace dart
-
-#endif  // !defined(DART_PRECOMPILED_RUNTIME)

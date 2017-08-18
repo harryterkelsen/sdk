@@ -96,6 +96,7 @@ class_literal_test/23: MissingCompileTimeError
 class_literal_test/24: MissingCompileTimeError
 class_literal_test/25: MissingCompileTimeError
 checked_setter_test: MissingCompileTimeError
+covariant_subtyping_with_substitution_test: RuntimeError
 
 [ $compiler == precompiler && $runtime == dart_precompiled ]
 assertion_initializer_const_error2_test/cc01: Crash, MissingCompileTimeError
@@ -121,7 +122,7 @@ function_subtype_inline2_test: RuntimeError
 generic_constructor_mixin_test/01: MissingCompileTimeError
 generic_constructor_mixin2_test/01: MissingCompileTimeError
 generic_constructor_mixin3_test/01: MissingCompileTimeError
-typevariable_substitution2_test/02: MissingCompileTimeError
+typevariable_substitution2_test/02: RuntimeError
 
 [ $compiler == precompiler && $runtime == dart_precompiled && $checked ]
 assertion_initializer_const_error2_test/cc01: Pass

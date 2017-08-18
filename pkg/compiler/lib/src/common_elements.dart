@@ -1333,6 +1333,9 @@ abstract class ElementEnvironment {
   /// Returns the type of [function].
   FunctionType getFunctionType(FunctionEntity function);
 
+  /// Returns the type of [field].
+  DartType getFieldType(FieldEntity field);
+
   /// Returns the type of the [local] function.
   FunctionType getLocalFunctionType(Local local);
 
