@@ -1368,4 +1368,7 @@ abstract class ElementEnvironment {
 
   /// Returns the function type that is an alias of a [typedef].
   FunctionType getFunctionTypeOfTypedef(TypedefEntity typedef);
+
+  /// Returns `true` if [entity] has been resolved.
+  bool hasBeenResolved(Entity entity);
 }

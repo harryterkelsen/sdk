@@ -1506,6 +1506,11 @@ class KernelElementEnvironment implements ElementEnvironment {
     // TODO(redemption): Support this.
     throw new UnsupportedError('ElementEnvironment.getTypedefAlias');
   }
+
+  // TODO(het): This assumes that everything in the kernel model has been
+  // resolved.
+  @override
+  bool hasBeenResolved(Entity entity) => true;
 }
 
 /// Visitor that converts kernel dart types into [DartType].

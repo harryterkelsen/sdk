@@ -740,6 +740,11 @@ class _CompilerElementEnvironment implements ElementEnvironment {
       covariant TypedefElement typedef) {
     return typedef.alias;
   }
+
+  @override
+  bool hasBeenResolved(covariant Element element) {
+    return _compiler.resolution.hasBeenResolved(element);
+  }
 }
 
 /// AST-based logic for processing annotations. These annotations are processed

@@ -129,7 +129,7 @@ class ElementInfoCollector {
       compiler.globalInference.results.resultOfParameter(e);
 
   FieldInfo visitField(FieldEntity field) {
-    if (!compiler.resolution.hasBeenResolved(field)) return null;
+    if (!environment.hasBeenResolved(field)) return null;
     TypeMask inferredType = _resultOfMember(field).type;
     // If a field has an empty inferred type it is never used.
     if (inferredType == null || inferredType.isEmpty) return null;
