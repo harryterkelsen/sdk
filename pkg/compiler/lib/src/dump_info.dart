@@ -214,9 +214,8 @@ class ElementInfoCollector {
         size: compiler.dumpInfoTask.sizeOf(element));
     _entityToInfo[element] = closureInfo;
 
-    ClosureRepresentationInfo closureRepresentation = compiler
-        .backendStrategy.closureDataLookup
-        .getClosureRepresentationInfo(element.methodElement);
+    ClosureRepresentationInfo closureRepresentation =
+        compiler.backendStrategy.closureDataLookup.getClosureInfo(element.node);
     assert(closureRepresentation.closureClassEntity == element);
 
     FunctionInfo functionInfo = visitFunction(closureRepresentation.callMethod);

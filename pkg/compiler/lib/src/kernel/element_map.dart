@@ -389,8 +389,7 @@ abstract class KernelToLocalsMap {
   /// variables involved with a closure class.
   // TODO(efortuna, johnniwinther): convey this information without a boolean
   // parameter.
-  Local getLocalVariable(ir.VariableDeclaration node,
-      {bool isClosureCallMethod = false});
+  Local getLocalVariable(ir.VariableDeclaration node);
 
   /// Returns the [Local] corresponding to the [node]. The node must be either
   /// a [ir.FunctionDeclaration] or [ir.FunctionExpression].
@@ -434,8 +433,15 @@ abstract class KernelToLocalsMap {
   JumpTarget getJumpTargetForWhile(ir.WhileStatement node);
 
   /// Returns the [CapturedLoopScope] for the loop [node] in
-  /// [closureClassMaps].
+  /// [closureLookup].
+  // TODO(johnniwinther): Remove this when [KernelAstAdapter] is deleted.
   CapturedLoopScope getCapturedLoopScope(
+      ClosureDataLookup closureLookup, ir.TreeNode node);
+
+  /// Returns the [ClosureRepresentationInfo] for the local function [node] in
+  /// [closureLookup].
+  // TODO(johnniwinther): Remove this when [KernelAstAdapter] is deleted.
+  ClosureRepresentationInfo getClosureRepresentationInfo(
       ClosureDataLookup closureLookup, ir.TreeNode node);
 }
 
