@@ -26,7 +26,8 @@ import 'types/types.dart'
         GlobalTypeInferenceElementResult,
         GlobalTypeInferenceMemberResult,
         TypeMask;
-import 'universe/world_builder.dart' show ReceiverConstraint;
+import 'universe/world_builder.dart'
+    show CodegenWorldBuilder, ReceiverConstraint;
 import 'universe/world_impact.dart'
     show ImpactUseCase, WorldImpact, WorldImpactVisitorImpl;
 import 'world.dart' show ClosedWorld;
@@ -36,6 +37,7 @@ class ElementInfoCollector {
   final ClosedWorld closedWorld;
 
   ElementEnvironment get environment => closedWorld.elementEnvironment;
+  CodegenWorldBuilder get codegenWorldBuilder => compiler.codegenWorldBuilder;
 
   final AllInfo result = new AllInfo();
   final Map<Entity, Info> _entityToInfo = <Entity, Info>{};
@@ -146,12 +148,9 @@ class ElementInfoCollector {
         outputUnit: _unitInfoForEntity(field),
         isConst: field.isConst);
     _entityToInfo[field] = info;
-    if (field.isConst) {
-      var value = compiler.backend.constantCompilerTask
-          .getConstantValue(environment.getFieldConstant(field));
-      if (value != null) {
-        info.initializer = _constantToInfo[value];
-      }
+    if (codegenWorldBuilder.hasConstantFieldInitializer(field)) {
+      info.initializer = _constantToInfo[
+          codegenWorldBuilder.getConstantFieldInitializer(field)];
     }
 
     if (JavaScriptBackend.TRACE_METHOD == 'post') {
@@ -262,8 +261,14 @@ class ElementInfoCollector {
     String code = compiler.dumpInfoTask.codeOf(function);
 
     List<ParameterInfo> parameters = <ParameterInfo>[];
-    compiler.codegenWorldBuilder.forEachParameter(function, (type, name, _) {
-      parameters.add(new ParameterInfo(name, '', '$type'));
+    List<String> inferredParameterTypes = <String>[];
+    codegenWorldBuilder.forEachParameterAsLocal(function, (parameter) {
+      inferredParameterTypes.add(_resultOfParameter(parameter).toString());
+    });
+    int parameterIndex = 0;
+    codegenWorldBuilder.forEachParameter(function, (type, name, _) {
+      parameters.add(new ParameterInfo(
+          name, inferredParameterTypes[parameterIndex++], '$type'));
     });
 
     var functionType = environment.getFunctionType(function);
