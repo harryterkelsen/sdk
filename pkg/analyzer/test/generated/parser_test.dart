@@ -42,6 +42,8 @@ main() {
  * which parser is used.
  */
 abstract class AbstractParserTestCase implements ParserTestHelpers {
+  bool get allowNativeClause;
+
   void set enableAssertInitializer(bool value);
 
   void set enableGenericMethodComments(bool value);
@@ -2063,35 +2065,35 @@ abstract class ErrorParserTestMixin implements AbstractParserTestCase {
     createParser('abstract C.c();');
     ClassMember member = parser.parseClassMember('C');
     expectNotNullIfNoErrors(member);
-    listener.assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
+    assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
   }
 
   void test_abstractClassMember_field() {
     createParser('abstract C f;');
     ClassMember member = parser.parseClassMember('C');
     expectNotNullIfNoErrors(member);
-    listener.assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
+    assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
   }
 
   void test_abstractClassMember_getter() {
     createParser('abstract get m;');
     ClassMember member = parser.parseClassMember('C');
     expectNotNullIfNoErrors(member);
-    listener.assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
+    assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
   }
 
   void test_abstractClassMember_method() {
     createParser('abstract m();');
     ClassMember member = parser.parseClassMember('C');
     expectNotNullIfNoErrors(member);
-    listener.assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
+    assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
   }
 
   void test_abstractClassMember_setter() {
     createParser('abstract set m(v);');
     ClassMember member = parser.parseClassMember('C');
     expectNotNullIfNoErrors(member);
-    listener.assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
+    assertErrorsWithCodes([ParserErrorCode.ABSTRACT_CLASS_MEMBER]);
   }
 
   void test_abstractEnum() {
@@ -2645,9 +2647,32 @@ class Foo {
     CompilationUnit unit = parseCompilationUnit(
         "export '' class A {}", [ParserErrorCode.EXPECTED_TOKEN]);
     ExportDirective directive = unit.directives[0] as ExportDirective;
+    expect(directive.uri, isNotNull);
+    expect(directive.uri.stringValue, '');
+    expect(directive.uri.beginToken.isSynthetic, false);
+    expect(directive.uri.isSynthetic, false);
     Token semicolon = directive.semicolon;
     expect(semicolon, isNotNull);
     expect(semicolon.isSynthetic, isTrue);
+    ClassDeclaration clazz = unit.declarations[0] as ClassDeclaration;
+    expect(clazz.name.name, 'A');
+  }
+
+  void test_expectedToken_uriAndSemicolonMissingAfterExport() {
+    CompilationUnit unit = parseCompilationUnit("export class A {}", [
+      ParserErrorCode.EXPECTED_STRING_LITERAL,
+      ParserErrorCode.EXPECTED_TOKEN,
+    ]);
+    ExportDirective directive = unit.directives[0] as ExportDirective;
+    expect(directive.uri, isNotNull);
+    expect(directive.uri.stringValue, '');
+    expect(directive.uri.beginToken.isSynthetic, true);
+    expect(directive.uri.isSynthetic, true);
+    Token semicolon = directive.semicolon;
+    expect(semicolon, isNotNull);
+    expect(semicolon.isSynthetic, isTrue);
+    ClassDeclaration clazz = unit.declarations[0] as ClassDeclaration;
+    expect(clazz.name.name, 'A');
   }
 
   void test_expectedToken_semicolonMissingAfterExpression() {
@@ -7776,7 +7801,7 @@ abstract class FormalParameterParserTestMixin
     expect(parameter, isNotNull);
     if (usingFastaParser) {
       // TODO(danrubel): should not be generating an error
-      assertErrorsWithCodes([ParserErrorCode.UNEXPECTED_TOKEN]);
+      assertErrorsWithCodes([ParserErrorCode.EXTRANEOUS_MODIFIER]);
     } else {
       assertNoErrors();
     }
@@ -7794,7 +7819,7 @@ abstract class FormalParameterParserTestMixin
     expect(parameter, isNotNull);
     if (usingFastaParser) {
       // TODO(danrubel): should not be generating an error
-      assertErrorsWithCodes([ParserErrorCode.UNEXPECTED_TOKEN]);
+      assertErrorsWithCodes([ParserErrorCode.EXTRANEOUS_MODIFIER]);
     } else {
       assertNoErrors();
     }
@@ -8154,7 +8179,7 @@ abstract class FormalParameterParserTestMixin
     expect(parameter, isNotNull);
     if (usingFastaParser) {
       // TODO(danrubel): should not be generating an error
-      assertErrorsWithCodes([ParserErrorCode.UNEXPECTED_TOKEN]);
+      assertErrorsWithCodes([ParserErrorCode.EXTRANEOUS_MODIFIER]);
     } else {
       assertNoErrors();
     }
@@ -8170,7 +8195,7 @@ abstract class FormalParameterParserTestMixin
     expect(parameter, isNotNull);
     if (usingFastaParser) {
       // TODO(danrubel): should not be generating an error
-      assertErrorsWithCodes([ParserErrorCode.UNEXPECTED_TOKEN]);
+      assertErrorsWithCodes([ParserErrorCode.EXTRANEOUS_MODIFIER]);
     } else {
       assertNoErrors();
     }
@@ -8283,6 +8308,9 @@ class ParserTestCase extends EngineTestCase
    * A flag indicating whether parser is to parse function bodies.
    */
   static bool parseFunctionBodies = true;
+
+  @override
+  bool allowNativeClause = true;
 
   /**
    * A flag indicating whether the parser is to parse asserts in the initializer
@@ -13809,7 +13837,13 @@ abstract class TopLevelParserTestMixin implements AbstractParserTestCase {
     createParser('class A native "nativeValue" {}');
     CompilationUnitMember member = parseFullCompilationUnitMember();
     expect(member, isNotNull);
-    assertNoErrors();
+    if (!allowNativeClause) {
+      assertErrorsWithCodes([
+        ParserErrorCode.NATIVE_CLAUSE_SHOULD_BE_ANNOTATION,
+      ]);
+    } else {
+      assertNoErrors();
+    }
     expect(member, new isInstanceOf<ClassDeclaration>());
     ClassDeclaration declaration = member;
     NativeClause nativeClause = declaration.nativeClause;

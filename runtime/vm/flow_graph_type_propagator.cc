@@ -21,6 +21,24 @@ DEFINE_FLAG(bool,
 
 DECLARE_FLAG(bool, propagate_types);
 
+static void TraceStrongModeType(const Instruction* instr,
+                                const AbstractType& type) {
+  if (FLAG_trace_experimental_strong_mode) {
+    THR_Print("[Strong mode] Type of %s - %s\n", instr->ToCString(),
+              type.ToCString());
+  }
+}
+
+static void TraceStrongModeType(const Instruction* instr,
+                                CompileType* compileType) {
+  if (FLAG_trace_experimental_strong_mode) {
+    const AbstractType* type = compileType->ToAbstractType();
+    if ((type != NULL) && !type->IsDynamicType()) {
+      TraceStrongModeType(instr, *type);
+    }
+  }
+}
+
 void FlowGraphTypePropagator::Propagate(FlowGraph* flow_graph) {
 #ifndef PRODUCT
   Thread* thread = flow_graph->thread();
@@ -217,22 +235,10 @@ void FlowGraphTypePropagator::VisitCheckClass(CheckClassInstr* check) {
     return;
   }
 
-  if (!check->Dependencies().IsNone()) {
-    // TODO(vegorov): If check is affected by side-effect we can still propagate
-    // the type further but not the cid.
-    return;
-  }
-
   SetCid(check->value()->definition(), check->cids().MonomorphicReceiverCid());
 }
 
 void FlowGraphTypePropagator::VisitCheckClassId(CheckClassIdInstr* check) {
-  if (!check->Dependencies().IsNone()) {
-    // TODO(vegorov): If check is affected by side-effect we can still propagate
-    // the type further but not the cid.
-    return;
-  }
-
   LoadClassIdInstr* load_cid =
       check->value()->definition()->OriginalDefinition()->AsLoadClassId();
   if (load_cid != NULL && check->cids().IsSingleCid()) {
@@ -320,6 +326,10 @@ void FlowGraphTypePropagator::VisitBranch(BranchInstr* instr) {
       comparison->InputAt(0)->definition()->AsLoadClassId();
   InstanceCallInstr* call =
       comparison->InputAt(0)->definition()->AsInstanceCall();
+  InstanceOfInstr* instanceOf =
+      comparison->InputAt(0)->definition()->AsInstanceOf();
+  bool is_simpleInstanceOf =
+      (call != NULL) && call->MatchesCoreName(Symbols::_simpleInstanceOf());
   RedefinitionInstr* redef = NULL;
   if (load_cid != NULL && comparison->InputAt(1)->BindsToConstant()) {
     intptr_t cid = Smi::Cast(comparison->InputAt(1)->BoundConstant()).Value();
@@ -328,25 +338,34 @@ void FlowGraphTypePropagator::VisitBranch(BranchInstr* instr) {
     redef = flow_graph_->EnsureRedefinition(true_successor,
                                             load_cid->object()->definition(),
                                             CompileType::FromCid(cid));
-  } else if ((call != NULL) &&
-             call->MatchesCoreName(Symbols::_simpleInstanceOf()) &&
+  } else if ((is_simpleInstanceOf || (instanceOf != NULL)) &&
              comparison->InputAt(1)->BindsToConstant() &&
              comparison->InputAt(1)->BoundConstant().IsBool()) {
-    ASSERT(call->ArgumentAt(1)->IsConstant());
     if (comparison->InputAt(1)->BoundConstant().raw() == Bool::False().raw()) {
       negated = !negated;
     }
     BlockEntryInstr* true_successor =
         negated ? instr->false_successor() : instr->true_successor();
-    const Object& type = call->ArgumentAt(1)->AsConstant()->value();
-    if (type.IsType() && !Type::Cast(type).IsDynamicType() &&
-        !Type::Cast(type).IsObjectType()) {
-      const bool is_nullable = Type::Cast(type).IsNullType()
-                                   ? CompileType::kNullable
-                                   : CompileType::kNonNullable;
+    const AbstractType* type = NULL;
+    Definition* left = NULL;
+    if (is_simpleInstanceOf) {
+      ASSERT(call->ArgumentAt(1)->IsConstant());
+      const Object& type_obj = call->ArgumentAt(1)->AsConstant()->value();
+      if (!type_obj.IsType()) {
+        return;
+      }
+      type = &Type::Cast(type_obj);
+      left = call->ArgumentAt(0);
+    } else {
+      type = &(instanceOf->type());
+      left = instanceOf->value()->definition();
+    }
+    if (!type->IsDynamicType() && !type->IsObjectType()) {
+      const bool is_nullable = type->IsNullType() ? CompileType::kNullable
+                                                  : CompileType::kNonNullable;
       redef = flow_graph_->EnsureRedefinition(
-          true_successor, call->ArgumentAt(0),
-          CompileType::FromAbstractType(Type::Cast(type), is_nullable));
+          true_successor, left,
+          CompileType::FromAbstractType(*type, is_nullable));
     }
   } else if (comparison->InputAt(0)->BindsToConstant() &&
              comparison->InputAt(0)->BoundConstant().IsNull()) {
@@ -840,6 +859,13 @@ CompileType ParameterInstr::ComputeType() const {
     return CompileType(CompileType::kNonNullable, cid, &type);
   }
 
+  if (FLAG_experimental_strong_mode && block_->IsGraphEntry()) {
+    LocalScope* scope = graph_entry->parsed_function().node_sequence()->scope();
+    const AbstractType& param_type = scope->VariableAt(index())->type();
+    TraceStrongModeType(this, param_type);
+    return CompileType::FromAbstractType(param_type);
+  }
+
   return CompileType::Dynamic();
 }
 
@@ -940,12 +966,36 @@ CompileType AllocateUninitializedContextInstr::ComputeType() const {
                      &Object::dynamic_type());
 }
 
+CompileType InstanceCallInstr::ComputeType() const {
+  if (FLAG_experimental_strong_mode) {
+    const Function& target = interface_target();
+    if (!target.IsNull()) {
+      // TODO(alexmarkov): instantiate generic result_type
+      const AbstractType& result_type =
+          AbstractType::ZoneHandle(target.result_type());
+      TraceStrongModeType(this, result_type);
+      return CompileType::FromAbstractType(result_type);
+    }
+  }
+
+  return CompileType::Dynamic();
+}
+
 CompileType PolymorphicInstanceCallInstr::ComputeType() const {
-  if (!IsSureToCallSingleRecognizedTarget()) return CompileType::Dynamic();
-  const Function& target = *targets_.TargetAt(0)->target;
-  return (target.recognized_kind() != MethodRecognizer::kUnknown)
-             ? CompileType::FromCid(MethodRecognizer::ResultCid(target))
-             : CompileType::Dynamic();
+  if (IsSureToCallSingleRecognizedTarget()) {
+    const Function& target = *targets_.TargetAt(0)->target;
+    if (target.recognized_kind() != MethodRecognizer::kUnknown) {
+      return CompileType::FromCid(MethodRecognizer::ResultCid(target));
+    }
+  }
+
+  if (FLAG_experimental_strong_mode) {
+    CompileType* type = instance_call()->Type();
+    TraceStrongModeType(this, type);
+    return *type;
+  }
+
+  return CompileType::Dynamic();
 }
 
 CompileType StaticCallInstr::ComputeType() const {
@@ -953,20 +1003,25 @@ CompileType StaticCallInstr::ComputeType() const {
     return CompileType::FromCid(result_cid_);
   }
 
-  if (Isolate::Current()->type_checks()) {
+  if (function_.recognized_kind() != MethodRecognizer::kUnknown) {
+    return CompileType::FromCid(MethodRecognizer::ResultCid(function_));
+  }
+
+  if (FLAG_experimental_strong_mode || Isolate::Current()->type_checks()) {
     const AbstractType& result_type =
         AbstractType::ZoneHandle(function().result_type());
+    TraceStrongModeType(this, result_type);
     return CompileType::FromAbstractType(result_type);
   }
 
-  return (function_.recognized_kind() != MethodRecognizer::kUnknown)
-             ? CompileType::FromCid(MethodRecognizer::ResultCid(function_))
-             : CompileType::Dynamic();
+  return CompileType::Dynamic();
 }
 
 CompileType LoadLocalInstr::ComputeType() const {
-  if (Isolate::Current()->type_checks()) {
-    return CompileType::FromAbstractType(local().type());
+  if (FLAG_experimental_strong_mode || Isolate::Current()->type_checks()) {
+    const AbstractType& local_type = local().type();
+    TraceStrongModeType(this, local_type);
+    return CompileType::FromAbstractType(local_type);
   }
   return CompileType::Dynamic();
 }
@@ -998,9 +1053,10 @@ CompileType LoadStaticFieldInstr::ComputeType() const {
   intptr_t cid = kDynamicCid;
   AbstractType* abstract_type = NULL;
   const Field& field = this->StaticField();
-  if (Isolate::Current()->type_checks()) {
+  if (FLAG_experimental_strong_mode || Isolate::Current()->type_checks()) {
     cid = kIllegalCid;
     abstract_type = &AbstractType::ZoneHandle(field.type());
+    TraceStrongModeType(this, *abstract_type);
   }
   ASSERT(field.is_static());
   if (field.is_final()) {
@@ -1051,9 +1107,11 @@ CompileType LoadFieldInstr::ComputeType() const {
   }
 
   const AbstractType* abstract_type = NULL;
-  if (Isolate::Current()->type_checks() &&
-      (type().IsFunctionType() || type().HasResolvedTypeClass())) {
+  if (FLAG_experimental_strong_mode ||
+      (Isolate::Current()->type_checks() &&
+       (type().IsFunctionType() || type().HasResolvedTypeClass()))) {
     abstract_type = &type();
+    TraceStrongModeType(this, *abstract_type);
   }
 
   if ((field_ != NULL) && (field_->guarded_cid() != kIllegalCid)) {
@@ -1116,6 +1174,24 @@ CompileType ShiftInt64OpInstr::ComputeType() const {
 
 CompileType UnaryInt64OpInstr::ComputeType() const {
   return CompileType::Int();
+}
+
+CompileType CheckedSmiOpInstr::ComputeType() const {
+  if (FLAG_experimental_strong_mode) {
+    CompileType* type = call()->Type();
+    TraceStrongModeType(this, type);
+    return *type;
+  }
+  return CompileType::Dynamic();
+}
+
+CompileType CheckedSmiComparisonInstr::ComputeType() const {
+  if (FLAG_experimental_strong_mode) {
+    CompileType* type = call()->Type();
+    TraceStrongModeType(this, type);
+    return *type;
+  }
+  return CompileType::Dynamic();
 }
 
 CompileType BoxIntegerInstr::ComputeType() const {

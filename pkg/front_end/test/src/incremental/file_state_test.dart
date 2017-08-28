@@ -11,6 +11,7 @@ import 'package:front_end/src/incremental/file_state.dart';
 import 'package:package_config/packages.dart';
 import 'package:test/test.dart';
 import 'package:test_reflective_loader/test_reflective_loader.dart';
+import 'package:kernel/target/targets.dart';
 
 import 'mock_sdk.dart';
 
@@ -34,8 +35,8 @@ class FileSystemStateTest {
         new UriTranslatorImpl(createSdkFiles(fileSystem), Packages.noPackages);
     _coreUri = Uri.parse('dart:core');
     expect(_coreUri, isNotNull);
-    fsState = new FileSystemState(byteStore, fileSystem, uriTranslator, <int>[],
-        (uri) {
+    fsState = new FileSystemState(byteStore, fileSystem,
+        new NoneTarget(new TargetFlags()), uriTranslator, <int>[], (uri) {
       _newFileUris.add(uri);
       return new Future.value();
     });
@@ -414,6 +415,12 @@ import 'b.dart';
     expect(cycles[1].libraries, unorderedEquals([a]));
     expect(cycles[2].libraries, unorderedEquals([b, c]));
     expect(cycles[3].libraries, unorderedEquals([d]));
+
+    expect(cycles[0].directDependencies, isEmpty);
+    expect(cycles[1].directDependencies, unorderedEquals([cycles[0]]));
+    expect(cycles[2].directDependencies, unorderedEquals([cycles[0]]));
+    expect(cycles[3].directDependencies,
+        unorderedEquals([cycles[0], cycles[1], cycles[2]]));
 
     expect(cycles[0].directUsers,
         unorderedEquals([cycles[1], cycles[2], cycles[3]]));

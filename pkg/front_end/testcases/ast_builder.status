@@ -348,6 +348,7 @@ inference_new/infer_instance_field_ref: Crash
 inference_new/infer_instance_field_ref_circular: Crash
 inference_new/infer_logical: Crash
 inference_new/infer_use_of_void: Fail
+inference_new/multiple_interface_inheritance: Fail # Issue #30547
 inference_new/property_get_toplevel: Crash
 inference_new/strongly_connected_component: Crash
 inference_new/unsafe_block_closure_inference_function_call_explicit_dynamic_param_via_expr2: Crash
@@ -437,7 +438,6 @@ runtime_checks/contravariant_generic_return: Crash
 runtime_checks/contravariant_generic_return_tear_off: Crash
 runtime_checks/contravariant_getter: Crash
 runtime_checks/covariant_generic_method_type_parameter: Crash
-runtime_checks/covariant_generic_parameter: Fail
 runtime_checks/covariant_generic_parameter_in_interface: Crash
 runtime_checks/covariant_generic_parameter_in_interface_mixin: Fail
 runtime_checks/covariant_generic_parameter_in_interface_super: Fail

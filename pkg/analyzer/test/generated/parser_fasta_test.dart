@@ -4,6 +4,7 @@
 
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/token.dart' as analyzer;
+import 'package:analyzer/dart/ast/token.dart' show TokenType;
 import 'package:analyzer/error/error.dart';
 import 'package:analyzer/error/listener.dart' show ErrorReporter;
 import 'package:analyzer/src/dart/scanner/scanner.dart';
@@ -136,32 +137,8 @@ class ErrorParserTest_Fasta extends FastaParserTestCase
     with ErrorParserTestMixin {
   @override
   @failingTest
-  void test_abstractClassMember_constructor() {
-    super.test_abstractClassMember_constructor();
-  }
-
-  @override
-  @failingTest
   void test_abstractClassMember_field() {
     super.test_abstractClassMember_field();
-  }
-
-  @override
-  @failingTest
-  void test_abstractClassMember_getter() {
-    super.test_abstractClassMember_getter();
-  }
-
-  @override
-  @failingTest
-  void test_abstractClassMember_method() {
-    super.test_abstractClassMember_method();
-  }
-
-  @override
-  @failingTest
-  void test_abstractClassMember_setter() {
-    super.test_abstractClassMember_setter();
   }
 
   @override
@@ -630,12 +607,6 @@ class ErrorParserTest_Fasta extends FastaParserTestCase
   @failingTest
   void test_expectedToken_parseStatement_afterVoid() {
     super.test_expectedToken_parseStatement_afterVoid();
-  }
-
-  @override
-  @failingTest
-  void test_expectedToken_semicolonMissingAfterExport() {
-    super.test_expectedToken_semicolonMissingAfterExport();
   }
 
   @override
@@ -2214,6 +2185,9 @@ class FastaParserTestCase extends Object
   analyzer.Token _fastaTokens;
 
   @override
+  bool allowNativeClause = false;
+
+  @override
   GatheringErrorListener get listener => _parserProxy._errorListener;
 
   /**
@@ -2263,6 +2237,11 @@ class FastaParserTestCase extends Object
 
   @override
   void assertErrorsWithCodes(List<ErrorCode> expectedErrorCodes) {
+    expectedErrorCodes = expectedErrorCodes.map((code) {
+      if (code == ParserErrorCode.ABSTRACT_CLASS_MEMBER)
+        return ParserErrorCode.EXTRANEOUS_MODIFIER;
+      return code;
+    }).toList();
     _parserProxy._errorListener.assertErrorsWithCodes(expectedErrorCodes);
   }
 
@@ -2277,6 +2256,7 @@ class FastaParserTestCase extends Object
     scanner.scanGenericMethodComments = enableGenericMethodComments;
     _fastaTokens = scanner.tokenize();
     _parserProxy = new ParserProxy(_fastaTokens,
+        allowNativeClause: allowNativeClause,
         enableGenericMethodComments: enableGenericMethodComments);
   }
 
@@ -2370,8 +2350,7 @@ class FastaParserTestCase extends Object
   @override
   ConstructorInitializer parseConstructorInitializer(String code) {
     String source = 'class __Test { __Test() : $code; }';
-    var unit =
-        _runParser(source, (parser) => parser.parseUnit) as CompilationUnit;
+    var unit = _runParser(source, null) as CompilationUnit;
     var clazz = unit.declarations[0] as ClassDeclaration;
     var constructor = clazz.members[0] as ConstructorDeclaration;
     return constructor.initializers.single;
@@ -2380,7 +2359,7 @@ class FastaParserTestCase extends Object
   @override
   CompilationUnit parseDirectives(String source,
       [List<ErrorCode> errorCodes = const <ErrorCode>[]]) {
-    return _runParser(source, (parser) => parser.parseUnit, errorCodes);
+    return _runParser(source, null, errorCodes);
   }
 
   @override
@@ -2773,7 +2752,8 @@ class ParserProxy implements analyzer.Parser {
    * Fasta token.
    */
   factory ParserProxy(analyzer.Token startingToken,
-      {bool enableGenericMethodComments: false}) {
+      {bool allowNativeClause: false,
+      bool enableGenericMethodComments: false}) {
     var library = new KernelLibraryBuilderProxy();
     var member = new BuilderProxy();
     var scope = new ScopeProxy();
@@ -2782,6 +2762,7 @@ class ParserProxy implements analyzer.Parser {
     var errorReporter = new ErrorReporter(errorListener, source);
     var astBuilder =
         new AstBuilder(errorReporter, library, member, scope, true);
+    astBuilder.allowNativeClause = allowNativeClause;
     astBuilder.parseGenericMethodComments = enableGenericMethodComments;
     var eventListener = new ForwardingTestListener(astBuilder);
     var fastaParser = new fasta.Parser(eventListener);
@@ -2807,7 +2788,7 @@ class ParserProxy implements analyzer.Parser {
 
   @override
   CompilationUnit parseCompilationUnit2() {
-    var result = _run((parser) => parser.parseUnit) as CompilationUnit;
+    var result = _run(null) as CompilationUnit;
     _eventListener.expectEmpty();
     return result;
   }
@@ -2830,7 +2811,14 @@ class ParserProxy implements analyzer.Parser {
    * Runs a single parser function, and returns the result as an analyzer AST.
    */
   Object _run(ParseFunction getParseFunction(fasta.Parser parser)) {
-    var parseFunction = getParseFunction(_fastaParser);
+    ParseFunction parseFunction;
+    if (getParseFunction != null) {
+      parseFunction = getParseFunction(_fastaParser);
+      _fastaParser.firstToken = _currentFastaToken;
+    } else {
+      parseFunction = _fastaParser.parseUnit;
+      // firstToken should be set by beginCompilationUnit event.
+    }
     _currentFastaToken = parseFunction(_currentFastaToken);
     expect(_currentFastaToken.isEof, isTrue);
     expect(_astBuilder.stack, hasLength(1));
@@ -2933,11 +2921,43 @@ class StatementParserTest_Fasta extends FastaParserTestCase
 @reflectiveTest
 class TopLevelParserTest_Fasta extends FastaParserTestCase
     with TopLevelParserTestMixin {
-  @override
-  @failingTest
-  void test_parseClassDeclaration_native() {
-    // TODO(paulberry): TODO(paulberry,ahe): Fasta parser doesn't appear to support "native" syntax yet.
-    super.test_parseClassDeclaration_native();
+  void test_parseClassDeclaration_native_missing_literal() {
+    createParser('class A native {}');
+    CompilationUnitMember member = parseFullCompilationUnitMember();
+    expect(member, isNotNull);
+    if (allowNativeClause) {
+      assertNoErrors();
+    } else {
+      assertErrorsWithCodes([
+        ParserErrorCode.NATIVE_CLAUSE_SHOULD_BE_ANNOTATION,
+      ]);
+    }
+    expect(member, new isInstanceOf<ClassDeclaration>());
+    ClassDeclaration declaration = member;
+    expect(declaration.nativeClause, isNotNull);
+    expect(declaration.nativeClause.nativeKeyword, isNotNull);
+    expect(declaration.nativeClause.name, isNull);
+    expect(declaration.endToken.type, TokenType.CLOSE_CURLY_BRACKET);
+  }
+
+  void test_parseClassDeclaration_native_allowed() {
+    allowNativeClause = true;
+    test_parseClassDeclaration_native();
+  }
+
+  void test_parseClassDeclaration_native_missing_literal_allowed() {
+    allowNativeClause = true;
+    test_parseClassDeclaration_native_missing_literal();
+  }
+
+  void test_parseClassDeclaration_native_missing_literal_not_allowed() {
+    allowNativeClause = false;
+    test_parseClassDeclaration_native_missing_literal();
+  }
+
+  void test_parseClassDeclaration_native_not_allowed() {
+    allowNativeClause = false;
+    test_parseClassDeclaration_native();
   }
 
   @override

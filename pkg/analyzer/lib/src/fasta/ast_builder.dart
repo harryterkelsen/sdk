@@ -60,6 +60,17 @@ class AstBuilder extends ScopeListener {
   /// bodies.
   final bool isFullAst;
 
+  /// `true` if the `native` clause is allowed
+  /// in class, method, and function declarations.
+  ///
+  /// This is being replaced by the @native(...) annotation.
+  //
+  // TODO(danrubel) Move this flag to a better location
+  // and should only be true if either:
+  // * The current library is a platform library
+  // * The current library has an import that uses the scheme "dart-ext".
+  bool allowNativeClause = false;
+
   AstBuilder(this.errorReporter, this.library, this.member, Scope scope,
       this.isFullAst,
       [Uri uri])
@@ -1278,15 +1289,22 @@ class AstBuilder extends ScopeListener {
   }
 
   @override
+  void handleNativeClause(Token nativeToken, bool hasName) {
+    push(ast.nativeClause(nativeToken, hasName ? pop() : null));
+  }
+
+  @override
   void endClassDeclaration(
       int interfacesCount,
       Token beginToken,
       Token classKeyword,
       Token extendsKeyword,
       Token implementsKeyword,
+      Token nativeToken,
       Token endToken) {
     debugEvent("ClassDeclaration");
     _ClassBody body = pop();
+    NativeClause nativeClause = nativeToken != null ? pop() : null;
     ImplementsClause implementsClause;
     if (implementsKeyword != null) {
       List<TypeName> interfaces = popList(interfacesCount);
@@ -1314,7 +1332,7 @@ class AstBuilder extends ScopeListener {
     Token abstractKeyword = modifiers?.abstractKeyword;
     List<Annotation> metadata = pop();
     Comment comment = pop();
-    declarations.add(ast.classDeclaration(
+    ClassDeclaration classDeclaration = ast.classDeclaration(
         comment,
         metadata,
         abstractKeyword,
@@ -1326,7 +1344,9 @@ class AstBuilder extends ScopeListener {
         implementsClause,
         body.beginToken,
         body.members,
-        body.endToken));
+        body.endToken);
+    classDeclaration.nativeClause = nativeClause;
+    declarations.add(classDeclaration);
   }
 
   @override
@@ -1886,25 +1906,49 @@ class AstBuilder extends ScopeListener {
   void addCompileTimeError(Message message, int charOffset) {
     Code code = message.code;
     Map<String, dynamic> arguments = message.arguments;
+
+    String stringOrTokenLexeme() {
+      var text = arguments['string'];
+      if (text == null) {
+        Token token = arguments['token'];
+        if (token != null) {
+          text = token.lexeme;
+        }
+      }
+      return text;
+    }
+
     switch (code.analyzerCode) {
       case "EXPECTED_TYPE_NAME":
         errorReporter?.reportErrorForOffset(
             ParserErrorCode.EXPECTED_TYPE_NAME, charOffset, 1);
         return;
+      case "NATIVE_CLAUSE_SHOULD_BE_ANNOTATION":
+        if (!allowNativeClause) {
+          errorReporter?.reportErrorForOffset(
+              ParserErrorCode.NATIVE_CLAUSE_SHOULD_BE_ANNOTATION,
+              charOffset,
+              1);
+        }
+        return;
       case "EXPECTED_STRING_LITERAL":
         errorReporter?.reportErrorForOffset(
             ParserErrorCode.EXPECTED_STRING_LITERAL, charOffset, 1);
         return;
+      case "EXTRANEOUS_MODIFIER":
+        String text = stringOrTokenLexeme();
+        errorReporter?.reportErrorForOffset(ParserErrorCode.EXTRANEOUS_MODIFIER,
+            charOffset, text.length, [text]);
+        return;
       case "UNEXPECTED_TOKEN":
-        var text = arguments['string'];
-        if (text == null) {
-          Token token = arguments['token'];
-          if (token != null) {
-            text = token.lexeme;
-          }
+        String text = stringOrTokenLexeme();
+        if (text == ';') {
+          errorReporter?.reportErrorForOffset(
+              ParserErrorCode.EXPECTED_TOKEN, charOffset, text.length, [text]);
+        } else {
+          errorReporter?.reportErrorForOffset(ParserErrorCode.UNEXPECTED_TOKEN,
+              charOffset, text.length, [text]);
         }
-        errorReporter?.reportErrorForOffset(
-            ParserErrorCode.UNEXPECTED_TOKEN, charOffset, 1, [text]);
         return;
       default:
       // fall through

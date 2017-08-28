@@ -418,6 +418,11 @@ class ClassElementImpl extends AbstractClassElementImpl
   final kernel.Class _kernel;
 
   /**
+   * If this class is resynthesized, whether it has a constant constructor.
+   */
+  bool _hasConstConstructorCached;
+
+  /**
    * The actual supertype extracted from desugared [_kernel].
    */
   kernel.Supertype _kernelSupertype;
@@ -1018,8 +1023,22 @@ class ClassElementImpl extends AbstractClassElementImpl
     return null;
   }
 
-  bool get _hasConstConstructorKernel =>
-      _kernel != null && _kernel.constructors.any((c) => c.isConst);
+  /**
+   * Return whether the class is resynthesized and has a constant constructor.
+   */
+  bool get _hasConstConstructor {
+    if (_hasConstConstructorCached == null) {
+      _hasConstConstructorCached = false;
+      if (_kernel != null) {
+        _hasConstConstructorCached = _kernel.constructors.any((c) => c.isConst);
+      }
+      if (_unlinkedClass != null) {
+        _hasConstConstructorCached = _unlinkedClass.executables.any(
+            (c) => c.kind == UnlinkedExecutableKind.constructor && c.isConst);
+      }
+    }
+    return _hasConstConstructorCached;
+  }
 
   @override
   void appendTo(StringBuffer buffer) {
@@ -4552,7 +4571,9 @@ class FieldElementImpl extends PropertyInducingElementImpl
   factory FieldElementImpl.forKernelFactory(
       ClassElementImpl enclosingClass, kernel.Field kernel) {
     if (kernel.isConst ||
-        kernel.isFinal && enclosingClass._hasConstConstructorKernel) {
+        kernel.isFinal &&
+            !kernel.isStatic &&
+            enclosingClass._hasConstConstructor) {
       return new ConstFieldElementImpl.forKernel(enclosingClass, kernel);
     } else {
       return new FieldElementImpl.forKernel(enclosingClass, kernel);
@@ -4578,7 +4599,9 @@ class FieldElementImpl extends PropertyInducingElementImpl
       UnlinkedVariable unlinkedVariable, ClassElementImpl enclosingClass) {
     if (unlinkedVariable.initializer?.bodyExpr != null &&
         (unlinkedVariable.isConst ||
-            unlinkedVariable.isFinal && !unlinkedVariable.isStatic)) {
+            unlinkedVariable.isFinal &&
+                !unlinkedVariable.isStatic &&
+                enclosingClass._hasConstConstructor)) {
       return new ConstFieldElementImpl.forSerialized(
           unlinkedVariable, enclosingClass);
     } else {
@@ -4594,6 +4617,9 @@ class FieldElementImpl extends PropertyInducingElementImpl
    * Return `true` if this field was explicitly marked as being covariant.
    */
   bool get isCovariant {
+    if (_kernel != null) {
+      return _kernel.isCovariant;
+    }
     if (_unlinkedVariable != null) {
       return _unlinkedVariable.isCovariant;
     }
@@ -5783,6 +5809,11 @@ class ImportElementImpl extends UriReferencedElementImpl
   final kernel.LibraryDependency _kernel;
 
   /**
+   * Whether this import is synthetic.
+   */
+  final bool _kernelSynthetic;
+
+  /**
    * The offset of the prefix of this import in the file that contains the this
    * import directive, or `-1` if this import is synthetic.
    */
@@ -5818,14 +5849,17 @@ class ImportElementImpl extends UriReferencedElementImpl
       : _unlinkedImport = null,
         _linkedDependency = null,
         _kernel = null,
+        _kernelSynthetic = false,
         super(null, offset);
 
   /**
    * Initialize using the given kernel.
    */
-  ImportElementImpl.forKernel(LibraryElementImpl enclosingLibrary, this._kernel)
+  ImportElementImpl.forKernel(LibraryElementImpl enclosingLibrary, this._kernel,
+      {bool isSynthetic: false})
       : _unlinkedImport = null,
         _linkedDependency = null,
+        _kernelSynthetic = isSynthetic,
         super.forSerialized(enclosingLibrary);
 
   /**
@@ -5834,6 +5868,7 @@ class ImportElementImpl extends UriReferencedElementImpl
   ImportElementImpl.forSerialized(this._unlinkedImport, this._linkedDependency,
       LibraryElementImpl enclosingLibrary)
       : _kernel = null,
+        _kernelSynthetic = false,
         super.forSerialized(enclosingLibrary);
 
   @override
@@ -5904,6 +5939,9 @@ class ImportElementImpl extends UriReferencedElementImpl
 
   @override
   bool get isSynthetic {
+    if (_kernel != null) {
+      return _kernelSynthetic;
+    }
     if (_unlinkedImport != null) {
       return _unlinkedImport.isImplicit;
     }
@@ -6080,6 +6118,14 @@ class ImportElementImpl extends UriReferencedElementImpl
  * The kernel context in which a library is resynthesized.
  */
 abstract class KernelLibraryResynthesizerContext {
+  /**
+   * The Kernel library for `dart:core`.
+   */
+  kernel.Library get coreLibrary;
+
+  /**
+   * The Kernel library being resynthesized.
+   */
   kernel.Library get library;
 
   /**
@@ -6231,6 +6277,8 @@ class LabelElementImpl extends ElementImpl implements LabelElement {
  * A concrete implementation of a [LibraryElement].
  */
 class LibraryElementImpl extends ElementImpl implements LibraryElement {
+  static final Uri _dartCore = Uri.parse('dart:core');
+
   /**
    * The analysis context in which this library is defined.
    */
@@ -6544,10 +6592,36 @@ class LibraryElementImpl extends ElementImpl implements LibraryElement {
   List<ImportElement> get imports {
     if (_imports == null) {
       if (_kernelContext != null) {
-        _imports = _kernelContext.library.dependencies
-            .where((k) => k.isImport)
-            .map((k) => new ImportElementImpl.forKernel(this, k))
-            .toList(growable: false);
+        var dependencies = _kernelContext.library.dependencies;
+        int numOfDependencies = dependencies.length;
+        // Compute the number of import dependencies.
+        bool hasCore = false;
+        int numOfImports = 0;
+        for (int i = 0; i < numOfDependencies; i++) {
+          kernel.LibraryDependency dependency = dependencies[i];
+          if (dependency.isImport) {
+            numOfImports++;
+            if (dependency.targetLibrary.importUri == _dartCore) {
+              hasCore = true;
+            }
+          }
+        }
+        // Create import elements.
+        var imports = new List<ImportElement>(numOfImports + (hasCore ? 0 : 1));
+        for (int i = 0; i < numOfDependencies; i++) {
+          kernel.LibraryDependency dependency = dependencies[i];
+          if (dependency.isImport) {
+            imports[i] = new ImportElementImpl.forKernel(this, dependency);
+          }
+        }
+        // If dart:core is not imported explicitly, import it implicitly.
+        if (!hasCore) {
+          imports[numOfImports] = new ImportElementImpl.forKernel(this,
+              new kernel.LibraryDependency.import(_kernelContext.coreLibrary),
+              isSynthetic: true);
+        }
+        // Set imports into the field.
+        _imports = imports;
       }
       if (_unlinkedDefiningUnit != null) {
         List<UnlinkedImport> unlinkedImports = _unlinkedDefiningUnit.imports;
@@ -8170,6 +8244,9 @@ class ParameterElementImpl extends VariableElementImpl
    * Return true if this parameter is explicitly marked as being covariant.
    */
   bool get isExplicitlyCovariant {
+    if (_kernel != null) {
+      return _kernel.isCovariant;
+    }
     if (_unlinkedParam != null) {
       return _unlinkedParam.isExplicitlyCovariant;
     }

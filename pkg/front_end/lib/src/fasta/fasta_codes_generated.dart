@@ -1025,7 +1025,8 @@ const Template<Message Function(Token token)> templateExtraneousModifier =
 const Code<Message Function(Token token)> codeExtraneousModifier =
     const Code<Message Function(Token token)>(
         "ExtraneousModifier", templateExtraneousModifier,
-        analyzerCode: "UNEXPECTED_TOKEN", dart2jsCode: "EXTRANEOUS_MODIFIER");
+        analyzerCode: "EXTRANEOUS_MODIFIER",
+        dart2jsCode: "EXTRANEOUS_MODIFIER");
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 Message _withArgumentsExtraneousModifier(Token token) {
@@ -1911,6 +1912,19 @@ const MessageCode messageNamedFunctionExpression = const MessageCode(
     "NamedFunctionExpression",
     dart2jsCode: "*ignored*",
     message: r"""A function expression can't have a name.""");
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const Code<Null> codeNativeClauseShouldBeAnnotation =
+    messageNativeClauseShouldBeAnnotation;
+
+// DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
+const MessageCode messageNativeClauseShouldBeAnnotation = const MessageCode(
+    "NativeClauseShouldBeAnnotation",
+    analyzerCode: "NATIVE_CLAUSE_SHOULD_BE_ANNOTATION",
+    dart2jsCode: "*fatal*",
+    message: r"""Native clause in this form is deprecated.""",
+    tip:
+        r"""Try removing this native clause and adding @native() or @native('native-name') before the declaration.""");
 
 // DO NOT EDIT. THIS FILE IS GENERATED. SEE TOP OF FILE.
 const Template<

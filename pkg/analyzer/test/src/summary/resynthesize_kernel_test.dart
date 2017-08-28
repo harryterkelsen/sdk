@@ -11,14 +11,13 @@ import 'package:analyzer/file_system/memory_file_system.dart';
 import 'package:analyzer/src/dart/element/element.dart';
 import 'package:analyzer/src/generated/source.dart';
 import 'package:analyzer/src/kernel/resynthesize.dart';
-import 'package:analyzer/src/summary/resynthesize.dart';
 import 'package:front_end/compiler_options.dart';
 import 'package:front_end/file_system.dart';
-import 'package:front_end/src/base/performace_logger.dart';
 import 'package:front_end/src/base/libraries_specification.dart';
+import 'package:front_end/src/base/performace_logger.dart';
 import 'package:front_end/src/base/processed_options.dart';
-import 'package:front_end/src/fasta/uri_translator_impl.dart';
 import 'package:front_end/src/byte_store/byte_store.dart';
+import 'package:front_end/src/fasta/uri_translator_impl.dart';
 import 'package:front_end/src/incremental/kernel_driver.dart';
 import 'package:kernel/kernel.dart' as kernel;
 import 'package:kernel/target/targets.dart';
@@ -111,12 +110,6 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
     var resynthesizer =
         new KernelResynthesizer(context, kernelResult.types, libraryMap);
     return resynthesizer.getLibrary(testUriStr);
-  }
-
-  @override
-  SummaryResynthesizer encodeDecodeLibrarySource(Source librarySource) {
-    // TODO(scheglov): implement encodeDecodeLibrarySource
-    throw new UnimplementedError();
   }
 
   @failingTest
@@ -218,18 +211,8 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
   }
 
   @failingTest
-  test_const_reference_type_functionType() async {
-    await super.test_const_reference_type_functionType();
-  }
-
-  @failingTest
   test_const_reference_type_imported_withPrefix() async {
     await super.test_const_reference_type_imported_withPrefix();
-  }
-
-  @failingTest
-  test_const_reference_type_typeParameter() async {
-    await super.test_const_reference_type_typeParameter();
   }
 
   @failingTest
@@ -273,27 +256,10 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
   }
 
   @failingTest
-  test_constructor_initializers_assertInvocation() async {
-    await super.test_constructor_initializers_assertInvocation();
-  }
-
-  @failingTest
-  test_constructor_initializers_assertInvocation_message() async {
-    await super.test_constructor_initializers_assertInvocation_message();
-  }
-
-  @failingTest
   @fastaProblem
   test_constructor_initializers_field_notConst() async {
     // Fasta generates additional `#errors` top-level variable.
     await super.test_constructor_initializers_field_notConst();
-  }
-
-  @failingTest
-  @fastaProblem
-  test_constructor_initializers_field_withParameter() async {
-    // https://github.com/dart-lang/sdk/issues/30251
-    await super.test_constructor_initializers_field_withParameter();
   }
 
   @failingTest
@@ -404,26 +370,6 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
   }
 
   @failingTest
-  test_field_covariant() async {
-    await super.test_field_covariant();
-  }
-
-  @failingTest
-  test_field_propagatedType_final_dep_inLib() async {
-    await super.test_field_propagatedType_final_dep_inLib();
-  }
-
-  @failingTest
-  test_field_propagatedType_final_dep_inPart() async {
-    await super.test_field_propagatedType_final_dep_inPart();
-  }
-
-  @failingTest
-  test_field_propagatedType_final_noDep_instance() async {
-    await super.test_field_propagatedType_final_noDep_instance();
-  }
-
-  @failingTest
   test_genericFunction_asGenericFunctionReturnType() async {
     await super.test_genericFunction_asGenericFunctionReturnType();
   }
@@ -431,46 +377,6 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
   @failingTest
   test_genericFunction_asParameterType() async {
     await super.test_genericFunction_asParameterType();
-  }
-
-  @failingTest
-  test_getElement_constructor_named() async {
-    await super.test_getElement_constructor_named();
-  }
-
-  @failingTest
-  test_getElement_constructor_unnamed() async {
-    await super.test_getElement_constructor_unnamed();
-  }
-
-  @failingTest
-  test_getElement_field() async {
-    await super.test_getElement_field();
-  }
-
-  @failingTest
-  test_getElement_getter() async {
-    await super.test_getElement_getter();
-  }
-
-  @failingTest
-  test_getElement_method() async {
-    await super.test_getElement_method();
-  }
-
-  @failingTest
-  test_getElement_operator() async {
-    await super.test_getElement_operator();
-  }
-
-  @failingTest
-  test_getElement_setter() async {
-    await super.test_getElement_setter();
-  }
-
-  @failingTest
-  test_getElement_unit() async {
-    await super.test_getElement_unit();
   }
 
   @failingTest
@@ -491,11 +397,6 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
   @failingTest
   test_import_invalidUri_metadata() async {
     await super.test_import_invalidUri_metadata();
-  }
-
-  @failingTest
-  test_import_self() async {
-    await super.test_import_self();
   }
 
   @failingTest
@@ -691,11 +592,6 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
   }
 
   @failingTest
-  test_parameter_covariant() async {
-    await super.test_parameter_covariant();
-  }
-
-  @failingTest
   test_parameter_covariant_inherited() async {
     await super.test_parameter_covariant_inherited();
   }
@@ -708,11 +604,6 @@ class ResynthesizeKernelStrongTest extends ResynthesizeTest {
   @failingTest
   test_parts_invalidUri_nullStringValue() async {
     await super.test_parts_invalidUri_nullStringValue();
-  }
-
-  @failingTest
-  test_setter_covariant() async {
-    await super.test_setter_covariant();
   }
 
   @failingTest
